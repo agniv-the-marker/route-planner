@@ -129,8 +129,6 @@ dmypy.json
 .pyre/
 
 # Route Sculptor
-*.gpx
-outputs/
 checkpoints/
 wandb/
 *.pt
