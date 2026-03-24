@@ -35,8 +35,8 @@ sf_bbox:
 # OSRM routing
 routing:
   base_url: "https://router.project-osrm.org"
-  profile: "bike"
-  request_delay: 1.0  # seconds between requests (rate limiting)
+  profile: "driving"  # public OSRM supports: driving, foot, bicycle (not bike)
+  request_delay: 1.5  # seconds between requests (rate limiting for public server)
 
 # Evaluation
 evaluation:
