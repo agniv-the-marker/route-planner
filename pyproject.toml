@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "route-sculptor"
+version = "0.1.0"
+description = "RL-powered GPX route generation from visual concepts"
+requires-python = ">=3.10"
+dependencies = [
+    "torch>=2.1",
+    "torchvision>=0.16",
+    "diffusers>=0.25",
+    "transformers>=4.36",
+    "accelerate>=0.25",
+    "trl>=0.7",
+    "opencv-python>=4.8",
+    "numpy>=1.24",
+    "scipy>=1.11",
+    "gpxpy>=1.6",
+    "Pillow>=10.0",
+    "requests>=2.31",
+    "folium>=0.15",
+    "gradio>=4.0",
+    "wandb>=0.16",
+    "pyyaml>=6.0",
+    "click>=8.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4",
+    "pytest-cov>=4.1",
+]
+
+[project.scripts]
+route-sculptor = "src.inference.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

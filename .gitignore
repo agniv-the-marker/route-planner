@@ -127,3 +127,15 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# Route Sculptor
+*.gpx
+outputs/
+checkpoints/
+wandb/
+*.pt
+*.pth
+*.ckpt
+route_cache/
+.idea/
+.vscode/

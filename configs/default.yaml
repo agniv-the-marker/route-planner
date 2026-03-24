@@ -1,0 +1,70 @@
+# Route Sculptor — Default Configuration
+
+# Image generation
+image_gen:
+  model_id: "runwayml/stable-diffusion-v1-5"
+  prompt_template: "a simple black silhouette of a {concept} on a white background, minimal, clean outline, no background details"
+  image_size: 512
+  num_inference_steps: 30
+  guidance_scale: 7.5
+
+# Edge detection
+edge_detect:
+  canny_low: 50
+  canny_high: 150
+  blur_kernel: 5  # Gaussian blur before Canny
+
+# Placement grid search
+placement:
+  num_positions: 10
+  num_scales: 5
+  num_rotations: 8
+  scale_range_km: [0.3, 5.0]  # min/max footprint in km
+
+# Waypoint sampling
+waypoints:
+  num_points: 65  # sample 65 points (within 50-80 range)
+
+# San Francisco bounding box (default: all of SF)
+sf_bbox:
+  min_lat: 37.7080
+  max_lat: 37.8120
+  min_lon: -122.5150
+  max_lon: -122.3570
+
+# Routing (Valhalla is default, OSRM as fallback)
+routing:
+  backend: "valhalla"  # "valhalla" or "osrm"
+  valhalla_url: "https://valhalla1.openstreetmap.de"
+  valhalla_costing: "bicycle"
+  osrm_url: "https://router.project-osrm.org"
+  osrm_profile: "driving"
+  request_delay: 1.0  # seconds between requests (rate limiting for public server)
+
+# Evaluation
+evaluation:
+  clip_model: "openai/clip-vit-base-patch32"
+  clip_prompt_template: "a bike route shaped like a {concept}"
+  reward_clip_weight: 0.7
+  reward_chamfer_weight: 0.3
+  render_size: 512
+
+# DDPO training
+training:
+  num_epochs: 100
+  batch_size: 4
+  learning_rate: 1.0e-5
+  kl_penalty: 0.1
+  num_samples_per_concept: 4
+  save_every: 10  # save checkpoint every N epochs
+  log_images_every: 5
+
+# Logging
+logging:
+  wandb_project: "route-sculptor"
+  wandb_entity: null  # set to your W&B username/team
+
+# Inference
+inference:
+  checkpoint: null  # path to trained checkpoint, null = base model
+  gradio_port: 7860
