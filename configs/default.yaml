@@ -25,6 +25,7 @@ placement:
 waypoints:
   num_points: 80  # more points help preserve sharp features
   curvature_weight: 2.0  # bias toward high-curvature areas (0 = uniform)
+  max_gap_km: 0.15  # densify: max 150m between waypoints so router follows roads
 
 # San Francisco bounding box (default: all of SF)
 sf_bbox:

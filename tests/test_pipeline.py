@@ -14,6 +14,7 @@ from src.pipeline.placement import (
 )
 from src.pipeline.waypoints import (
     compute_arc_lengths,
+    densify_waypoints,
     sample_adaptive_waypoints,
     sample_uniform_waypoints,
 )
@@ -149,3 +150,29 @@ def test_sample_adaptive_waypoints_star():
 
     # Adaptive should cluster more points near the sharp tips
     assert adaptive_near_tips >= uniform_near_tips
+
+
+def test_densify_waypoints():
+    """Densify should subdivide long segments."""
+    # Two points ~1.11 km apart (0.01 deg lat ≈ 1.11 km)
+    waypoints = np.array([
+        [37.77, -122.42],
+        [37.78, -122.42],
+    ])
+    densified = densify_waypoints(waypoints, max_gap_km=0.2)
+    # Should have at least 6 points (1.11 km / 0.2 km ≈ 6 segments)
+    assert len(densified) >= 6
+    # First and last should match originals
+    np.testing.assert_allclose(densified[0], waypoints[0], atol=1e-8)
+    np.testing.assert_allclose(densified[-1], waypoints[-1], atol=1e-8)
+
+
+def test_densify_waypoints_no_change():
+    """Densify should not add points if gaps are already small."""
+    waypoints = np.array([
+        [37.770, -122.420],
+        [37.7705, -122.420],  # ~55m apart
+        [37.771, -122.420],
+    ])
+    densified = densify_waypoints(waypoints, max_gap_km=0.2)
+    assert len(densified) == 3

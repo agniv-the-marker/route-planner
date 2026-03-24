@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import math
+
 import numpy as np
 
 
@@ -173,3 +175,48 @@ def sample_adaptive_waypoints(
         waypoints[i] = contour[idx] + t * (contour[idx + 1] - contour[idx])
 
     return waypoints
+
+
+def densify_waypoints(
+    waypoints: np.ndarray,
+    max_gap_km: float = 0.2,
+) -> np.ndarray:
+    """Insert intermediate waypoints so no two consecutive points are farther
+    than *max_gap_km* apart.
+
+    Long gaps between waypoints force the road router to take multi-block
+    detours that zig-zag across the street grid.  Keeping gaps short
+    (~200 m) means the router only needs one or two turns per segment,
+    producing a path that looks like something a person would actually ride.
+
+    Args:
+        waypoints: (N, 2) array of (lat, lon) waypoints.
+        max_gap_km: Maximum allowed gap in kilometres.
+
+    Returns:
+        Densified (M, 2) array with M >= N.
+    """
+    if len(waypoints) < 2:
+        return waypoints
+
+    DEG_TO_KM_LAT = 111.0
+
+    result = [waypoints[0]]
+    for i in range(len(waypoints) - 1):
+        p1 = waypoints[i]
+        p2 = waypoints[i + 1]
+
+        dlat = (p2[0] - p1[0]) * DEG_TO_KM_LAT
+        avg_lat = (p1[0] + p2[0]) / 2.0
+        dlon = (p2[1] - p1[1]) * DEG_TO_KM_LAT * math.cos(math.radians(avg_lat))
+        dist_km = math.sqrt(dlat ** 2 + dlon ** 2)
+
+        if dist_km > max_gap_km:
+            n_subdivisions = math.ceil(dist_km / max_gap_km)
+            for j in range(1, n_subdivisions):
+                t = j / n_subdivisions
+                result.append(p1 + t * (p2 - p1))
+
+        result.append(p2)
+
+    return np.array(result)

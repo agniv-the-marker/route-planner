@@ -59,21 +59,92 @@ def create_heart_silhouette(size: int = 512) -> Image.Image:
 
 
 def create_horse_silhouette(size: int = 512) -> Image.Image:
-    """Create a rough horse-like silhouette using basic shapes."""
+    """Create a recognisable horse silhouette (side view, facing left)
+    as a single filled outline with proper equine proportions."""
     img = Image.new("RGB", (size, size), (255, 255, 255))
     draw = ImageDraw.Draw(img)
-
-    # Simple horse-like polygon
     s = size / 512
+
+    # Single outline traced clockwise starting at muzzle.
+    # Horse facing left, standing, with head up.
     points = [
-        (180*s, 350*s), (160*s, 280*s), (140*s, 220*s), (130*s, 170*s),
-        (150*s, 120*s), (180*s, 80*s), (200*s, 60*s), (220*s, 50*s),
-        (240*s, 55*s), (250*s, 70*s), (245*s, 90*s), (260*s, 100*s),
-        (280*s, 110*s), (300*s, 130*s), (320*s, 160*s), (340*s, 200*s),
-        (350*s, 250*s), (355*s, 300*s), (360*s, 350*s), (370*s, 400*s),
-        (365*s, 430*s), (340*s, 430*s), (335*s, 380*s), (320*s, 350*s),
-        (300*s, 340*s), (280*s, 350*s), (260*s, 380*s), (250*s, 430*s),
-        (230*s, 430*s), (225*s, 390*s), (220*s, 360*s), (200*s, 360*s),
+        # Muzzle & lower lip
+        (55*s, 105*s), (48*s, 100*s), (40*s, 92*s), (38*s, 82*s),
+        # Nose bridge up to forehead
+        (42*s, 72*s), (50*s, 62*s), (62*s, 54*s), (76*s, 48*s),
+        # Ear 1
+        (88*s, 44*s), (86*s, 26*s), (96*s, 36*s),
+        # Ear 2
+        (104*s, 32*s), (112*s, 22*s), (114*s, 40*s),
+        # Poll, crest of neck (mane side)
+        (120*s, 50*s), (132*s, 62*s), (148*s, 82*s),
+        (168*s, 108*s), (188*s, 138*s), (205*s, 162*s),
+        # Withers (highest point of back)
+        (218*s, 172*s), (228*s, 168*s), (238*s, 166*s),
+        # Back (slightly dipped then rising to croup)
+        (260*s, 170*s), (285*s, 172*s), (310*s, 170*s),
+        (335*s, 168*s), (355*s, 172*s),
+        # Croup / top of rump
+        (370*s, 180*s), (380*s, 192*s),
+        # Tail
+        (390*s, 190*s), (410*s, 178*s), (430*s, 175*s),
+        (448*s, 182*s), (460*s, 200*s), (465*s, 225*s),
+        (460*s, 255*s), (448*s, 278*s), (432*s, 290*s),
+        (418*s, 288*s), (410*s, 275*s), (405*s, 255*s),
+        (398*s, 232*s), (392*s, 212*s),
+        # Buttock descending
+        (385*s, 220*s), (380*s, 240*s), (375*s, 262*s),
+        (370*s, 280*s), (365*s, 295*s),
+        # Hind-right thigh → hock → cannon → hoof
+        (368*s, 315*s), (372*s, 340*s), (375*s, 365*s),
+        (374*s, 390*s), (370*s, 415*s), (368*s, 438*s),
+        (366*s, 452*s),
+        # Hind-right hoof
+        (376*s, 458*s), (382*s, 455*s), (384*s, 448*s),
+        # Hind-right leg back side up to stifle
+        (382*s, 425*s), (378*s, 400*s), (376*s, 378*s),
+        (378*s, 358*s), (380*s, 340*s),
+        # Gap between hind legs
+        (375*s, 325*s), (365*s, 312*s),
+        # Hind-left thigh
+        (355*s, 320*s), (348*s, 342*s), (342*s, 365*s),
+        (338*s, 390*s), (334*s, 415*s), (332*s, 438*s),
+        (330*s, 452*s),
+        # Hind-left hoof
+        (340*s, 458*s), (348*s, 455*s), (350*s, 448*s),
+        # Hind-left leg back side
+        (348*s, 425*s), (345*s, 402*s), (340*s, 378*s),
+        (335*s, 355*s), (328*s, 335*s), (318*s, 318*s),
+        # Belly (curving forward under body)
+        (300*s, 308*s), (275*s, 312*s), (250*s, 314*s),
+        (225*s, 312*s), (205*s, 308*s),
+        # Front-right upper leg
+        (200*s, 315*s), (198*s, 335*s), (195*s, 358*s),
+        (192*s, 382*s), (188*s, 408*s), (186*s, 432*s),
+        (184*s, 452*s),
+        # Front-right hoof
+        (194*s, 458*s), (202*s, 455*s), (204*s, 448*s),
+        # Front-right leg back side
+        (202*s, 428*s), (200*s, 405*s), (202*s, 382*s),
+        (206*s, 358*s), (210*s, 338*s), (215*s, 320*s),
+        # Gap between front legs
+        (210*s, 310*s), (200*s, 305*s),
+        # Front-left upper leg
+        (188*s, 310*s), (180*s, 330*s), (174*s, 355*s),
+        (168*s, 380*s), (163*s, 408*s), (160*s, 432*s),
+        (158*s, 452*s),
+        # Front-left hoof
+        (168*s, 458*s), (176*s, 455*s), (178*s, 448*s),
+        # Front-left leg back side
+        (176*s, 428*s), (175*s, 405*s), (178*s, 382*s),
+        (182*s, 358*s), (185*s, 335*s), (188*s, 315*s),
+        # Chest rising
+        (182*s, 298*s), (170*s, 278*s), (158*s, 258*s),
+        # Throat (up to jaw)
+        (145*s, 238*s), (130*s, 215*s), (115*s, 192*s),
+        (100*s, 168*s), (88*s, 148*s), (78*s, 130*s),
+        # Jaw line → back to muzzle
+        (70*s, 118*s), (62*s, 112*s),
     ]
     draw.polygon(points, fill=(0, 0, 0))
     return img
@@ -158,7 +229,7 @@ def main():
 
     # Step 4: Sample waypoints (adaptive: more points at sharp corners)
     logger.info("Step 4: Sampling waypoints (curvature-adaptive)...")
-    from src.pipeline.waypoints import sample_adaptive_waypoints
+    from src.pipeline.waypoints import sample_adaptive_waypoints, densify_waypoints
 
     wp_cfg = cfg["waypoints"]
     waypoints = sample_adaptive_waypoints(
@@ -167,6 +238,11 @@ def main():
         curvature_weight=wp_cfg.get("curvature_weight", 2.0),
     )
     logger.info(f"  Sampled {len(waypoints)} waypoints")
+
+    # Densify: ensure no gap > max_gap_km so the router follows roads naturally
+    max_gap = wp_cfg.get("max_gap_km", 0.15)
+    waypoints = densify_waypoints(waypoints, max_gap_km=max_gap)
+    logger.info(f"  Densified to {len(waypoints)} waypoints (max gap {max_gap*1000:.0f}m)")
 
     # Step 5: Routing
     if args.skip_routing:

@@ -58,7 +58,7 @@ def create_app(config_path: str = "configs/default.yaml"):
         """Generate a route for the given concept."""
         from src.pipeline.edge_detect import process_image
         from src.pipeline.placement import BBox, grid_search
-        from src.pipeline.waypoints import sample_adaptive_waypoints
+        from src.pipeline.waypoints import sample_adaptive_waypoints, densify_waypoints
         from src.pipeline.gpx_utils import route_to_gpx, save_gpx
         from src.evaluation.render import render_polyline, render_map_overlay
         from src.evaluation.chamfer import chamfer_score
@@ -103,6 +103,9 @@ def create_app(config_path: str = "configs/default.yaml"):
             geo_contour,
             num_points=wp_cfg["num_points"],
             curvature_weight=wp_cfg.get("curvature_weight", 2.0),
+        )
+        waypoints = densify_waypoints(
+            waypoints, max_gap_km=wp_cfg.get("max_gap_km", 0.15),
         )
 
         # Routing
