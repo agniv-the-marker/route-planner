@@ -3,6 +3,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# Route cache (may contain stale/unrouted results)
+route_cache/
+
 # C extensions
 *.so
 
@@ -129,8 +132,6 @@ dmypy.json
 .pyre/
 
 # Route Sculptor
-*.gpx
-outputs/
 checkpoints/
 wandb/
 *.pt
