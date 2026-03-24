@@ -45,7 +45,7 @@ def build_ddpo_config(config: dict):
 def create_reward_fn(config: dict):
     """Create the reward function from config."""
     from src.pipeline.placement import BBox
-    from src.pipeline.routing import OSRMRouter
+    from src.pipeline.routing import create_router
     from src.evaluation.clip_score import CLIPScorer
     from src.evaluation.reward import RewardFunction
     from src.training.reward_fn import DDPORewardWrapper
@@ -58,12 +58,7 @@ def create_reward_fn(config: dict):
         max_lon=sf["max_lon"],
     )
 
-    routing_cfg = config["routing"]
-    router = OSRMRouter(
-        base_url=routing_cfg["base_url"],
-        profile=routing_cfg["profile"],
-        request_delay=routing_cfg["request_delay"],
-    )
+    router = create_router(config["routing"])
 
     eval_cfg = config["evaluation"]
     clip_scorer = CLIPScorer(

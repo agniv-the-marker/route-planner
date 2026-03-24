@@ -74,9 +74,10 @@ class ValhallaRouter:
         max_retries = 3
         for attempt in range(max_retries):
             try:
-                resp = self._session.get(
-                    url, params={"json": json.dumps(payload)}, timeout=30
-                )
+                resp = self._session.post(url, json=payload, timeout=30)
+                if resp.status_code == 400:
+                    logger.warning(f"Valhalla 400 error: {resp.text[:200]}")
+                    return [start, end]
                 resp.raise_for_status()
                 data = resp.json()
                 break
@@ -161,6 +162,28 @@ class ValhallaRouter:
         self._save_cache(cache_key, full_route)
         logger.info(f"Routed {len(waypoints)} waypoints → {len(full_route)} route points")
         return full_route
+
+
+def create_router(config: dict) -> "ValhallaRouter | OSRMRouter":
+    """Create a router from a routing config dict.
+
+    Config keys: backend, valhalla_url, valhalla_costing,
+                 osrm_url, osrm_profile, request_delay.
+    """
+    backend = config.get("backend", "valhalla")
+    delay = config.get("request_delay", 1.0)
+
+    if backend == "valhalla":
+        return ValhallaRouter(
+            base_url=config.get("valhalla_url", VALHALLA_BASE_URL),
+            costing=config.get("valhalla_costing", "bicycle"),
+            request_delay=delay,
+        )
+    return OSRMRouter(
+        base_url=config.get("osrm_url", OSRM_BASE_URL),
+        profile=config.get("osrm_profile", "driving"),
+        request_delay=delay,
+    )
 
 
 class OSRMRouter:

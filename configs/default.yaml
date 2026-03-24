@@ -32,11 +32,14 @@ sf_bbox:
   min_lon: -122.5150
   max_lon: -122.3570
 
-# OSRM routing
+# Routing (Valhalla is default, OSRM as fallback)
 routing:
-  base_url: "https://router.project-osrm.org"
-  profile: "driving"  # public OSRM supports: driving, foot, bicycle (not bike)
-  request_delay: 1.5  # seconds between requests (rate limiting for public server)
+  backend: "valhalla"  # "valhalla" or "osrm"
+  valhalla_url: "https://valhalla1.openstreetmap.de"
+  valhalla_costing: "bicycle"
+  osrm_url: "https://router.project-osrm.org"
+  osrm_profile: "driving"
+  request_delay: 1.0  # seconds between requests (rate limiting for public server)
 
 # Evaluation
 evaluation:

@@ -25,7 +25,7 @@ def create_app(config_path: str = "configs/default.yaml"):
     def _get_components():
         if "generator" not in _components:
             from src.pipeline.image_gen import ImageGenerator
-            from src.pipeline.routing import OSRMRouter
+            from src.pipeline.routing import create_router
             from src.evaluation.clip_score import CLIPScorer
 
             gen_cfg = cfg["image_gen"]
@@ -37,12 +37,7 @@ def create_app(config_path: str = "configs/default.yaml"):
                 guidance_scale=gen_cfg["guidance_scale"],
             )
 
-            r_cfg = cfg["routing"]
-            _components["router"] = OSRMRouter(
-                base_url=r_cfg["base_url"],
-                profile=r_cfg["profile"],
-                request_delay=r_cfg["request_delay"],
-            )
+            _components["router"] = create_router(cfg["routing"])
 
             eval_cfg = cfg["evaluation"]
             _components["clip_scorer"] = CLIPScorer(

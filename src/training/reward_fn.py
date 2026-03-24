@@ -15,7 +15,7 @@ from PIL import Image
 from src.pipeline.edge_detect import process_image
 from src.pipeline.placement import BBox, grid_search
 from src.pipeline.waypoints import sample_uniform_waypoints
-from src.pipeline.routing import OSRMRouter
+from src.pipeline.routing import ValhallaRouter
 from src.evaluation.reward import RewardFunction
 
 logger = logging.getLogger(__name__)
@@ -31,7 +31,7 @@ class DDPORewardWrapper:
     def __init__(
         self,
         bbox: BBox | None = None,
-        router: OSRMRouter | None = None,
+        router: ValhallaRouter | None = None,
         reward_fn: RewardFunction | None = None,
         num_waypoints: int = 65,
         num_positions: int = 10,
@@ -46,7 +46,7 @@ class DDPORewardWrapper:
             min_lat=37.7080, max_lat=37.8120,
             min_lon=-122.5150, max_lon=-122.3570,
         )
-        self.router = router or OSRMRouter()
+        self.router = router or ValhallaRouter()
         self.reward_fn = reward_fn or RewardFunction()
         self.num_waypoints = num_waypoints
         self.num_positions = num_positions

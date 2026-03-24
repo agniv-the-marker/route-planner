@@ -45,7 +45,6 @@ def main(
     from src.pipeline.edge_detect import process_image
     from src.pipeline.placement import grid_search
     from src.pipeline.waypoints import sample_uniform_waypoints
-    from src.pipeline.routing import OSRMRouter
     from src.pipeline.gpx_utils import route_to_gpx, save_gpx
     from src.evaluation.render import render_polyline, render_map_overlay
 
@@ -113,18 +112,15 @@ def main(
     wp_cfg = cfg["waypoints"]
     waypoints = sample_uniform_waypoints(geo_contour, num_points=wp_cfg["num_points"])
 
-    # Step 5: Route via OSRM
-    logger.info("Computing bike route via OSRM...")
-    r_cfg = cfg["routing"]
-    router = OSRMRouter(
-        base_url=r_cfg["base_url"],
-        profile=r_cfg["profile"],
-        request_delay=r_cfg["request_delay"],
-    )
+    # Step 5: Route via routing engine
+    logger.info("Computing bike route...")
+    from src.pipeline.routing import create_router
+
+    router = create_router(cfg["routing"])
     route = router.route_waypoints(waypoints)
 
     if len(route) < 2:
-        click.echo("Error: OSRM routing returned insufficient points.", err=True)
+        click.echo("Error: Routing returned insufficient points.", err=True)
         raise SystemExit(1)
 
     # Step 6: Save GPX
