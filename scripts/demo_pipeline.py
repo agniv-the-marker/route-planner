@@ -164,19 +164,17 @@ def main():
     waypoints = sample_uniform_waypoints(geo_contour, num_points=wp_cfg["num_points"])
     logger.info(f"  Sampled {len(waypoints)} waypoints")
 
-    # Step 5: OSRM Routing
+    # Step 5: Routing
     if args.skip_routing:
-        logger.info("Step 5: Skipping OSRM routing (--skip-routing)")
+        logger.info("Step 5: Skipping routing (--skip-routing)")
         route = [(float(w[0]), float(w[1])) for w in waypoints]
     else:
-        logger.info("Step 5: Routing via OSRM (this may take a minute)...")
-        from src.pipeline.routing import OSRMRouter
+        logger.info("Step 5: Routing via Valhalla (this may take a minute)...")
+        from src.pipeline.routing import ValhallaRouter
 
-        r_cfg = cfg["routing"]
-        router = OSRMRouter(
-            base_url=r_cfg["base_url"],
-            profile=r_cfg["profile"],
-            request_delay=r_cfg["request_delay"],
+        router = ValhallaRouter(
+            costing="bicycle",
+            request_delay=1.0,
         )
         start_time = time.time()
         route = router.route_waypoints(waypoints)
