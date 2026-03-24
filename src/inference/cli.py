@@ -44,7 +44,7 @@ def main(
     from src.pipeline.image_gen import ImageGenerator
     from src.pipeline.edge_detect import process_image
     from src.pipeline.placement import grid_search
-    from src.pipeline.waypoints import sample_uniform_waypoints
+    from src.pipeline.waypoints import sample_adaptive_waypoints
     from src.pipeline.gpx_utils import route_to_gpx, save_gpx
     from src.evaluation.render import render_polyline, render_map_overlay
 
@@ -110,7 +110,11 @@ def main(
 
     # Step 4: Sample waypoints
     wp_cfg = cfg["waypoints"]
-    waypoints = sample_uniform_waypoints(geo_contour, num_points=wp_cfg["num_points"])
+    waypoints = sample_adaptive_waypoints(
+        geo_contour,
+        num_points=wp_cfg["num_points"],
+        curvature_weight=wp_cfg.get("curvature_weight", 2.0),
+    )
 
     # Step 5: Route via routing engine
     logger.info("Computing bike route...")

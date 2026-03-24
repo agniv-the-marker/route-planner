@@ -156,12 +156,16 @@ def main():
         f"score={best.score:.4f}"
     )
 
-    # Step 4: Sample waypoints
-    logger.info("Step 4: Sampling waypoints...")
-    from src.pipeline.waypoints import sample_uniform_waypoints
+    # Step 4: Sample waypoints (adaptive: more points at sharp corners)
+    logger.info("Step 4: Sampling waypoints (curvature-adaptive)...")
+    from src.pipeline.waypoints import sample_adaptive_waypoints
 
     wp_cfg = cfg["waypoints"]
-    waypoints = sample_uniform_waypoints(geo_contour, num_points=wp_cfg["num_points"])
+    waypoints = sample_adaptive_waypoints(
+        geo_contour,
+        num_points=wp_cfg["num_points"],
+        curvature_weight=wp_cfg.get("curvature_weight", 2.0),
+    )
     logger.info(f"  Sampled {len(waypoints)} waypoints")
 
     # Step 5: Routing

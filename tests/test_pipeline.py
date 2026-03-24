@@ -14,6 +14,7 @@ from src.pipeline.placement import (
 )
 from src.pipeline.waypoints import (
     compute_arc_lengths,
+    sample_adaptive_waypoints,
     sample_uniform_waypoints,
 )
 
@@ -107,3 +108,44 @@ def test_sample_uniform_waypoints_open():
     assert waypoints.shape == (5, 2)
     np.testing.assert_allclose(waypoints[0], [0, 0], atol=1e-6)
     np.testing.assert_allclose(waypoints[-1], [2, 0], atol=1e-6)
+
+
+def test_sample_adaptive_waypoints_star():
+    """Adaptive sampling should place more points near star tips."""
+    # Build a dense star contour (interpolated edges, like the real pipeline)
+    vertices = []
+    outer_r, inner_r = 1.0, 0.4
+    for i in range(10):
+        angle = np.radians(i * 36 - 90)
+        r = outer_r if i % 2 == 0 else inner_r
+        vertices.append([r * np.cos(angle), r * np.sin(angle)])
+    vertices.append(vertices[0])  # close loop
+
+    # Interpolate 20 points per edge to get a dense contour
+    dense = []
+    for i in range(len(vertices) - 1):
+        for t in np.linspace(0, 1, 20, endpoint=False):
+            p = np.array(vertices[i]) * (1 - t) + np.array(vertices[i + 1]) * t
+            dense.append(p)
+    contour = np.array(dense, dtype=np.float64)
+
+    waypoints = sample_adaptive_waypoints(contour, num_points=30, close_loop=True, curvature_weight=2.0)
+    assert waypoints.shape == (30, 2)
+
+    # Count how many waypoints fall near each star tip (outer vertices)
+    tips = np.array(vertices[::2][:5])
+    threshold = 0.15  # distance threshold to count as "near a tip"
+
+    adaptive_near_tips = 0
+    for wp in waypoints:
+        if np.min(np.sqrt(((tips - wp) ** 2).sum(axis=1))) < threshold:
+            adaptive_near_tips += 1
+
+    uniform = sample_uniform_waypoints(contour, num_points=30, close_loop=True)
+    uniform_near_tips = 0
+    for wp in uniform:
+        if np.min(np.sqrt(((tips - wp) ** 2).sum(axis=1))) < threshold:
+            uniform_near_tips += 1
+
+    # Adaptive should cluster more points near the sharp tips
+    assert adaptive_near_tips >= uniform_near_tips
