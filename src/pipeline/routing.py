@@ -59,8 +59,12 @@ class ValhallaRouter:
 
     def route_segment(
         self, start: tuple[float, float], end: tuple[float, float]
-    ) -> list[tuple[float, float]]:
-        """Route between two points (lat, lon) via Valhalla."""
+    ) -> list[tuple[float, float]] | None:
+        """Route between two points (lat, lon) via Valhalla.
+
+        Returns the routed path, or *None* if the server could not
+        produce a route (caller should try a fallback).
+        """
         url = f"{self.base_url}/route"
         payload = {
             "locations": [
@@ -77,7 +81,7 @@ class ValhallaRouter:
                 resp = self._session.post(url, json=payload, timeout=30)
                 if resp.status_code == 400:
                     logger.warning(f"Valhalla 400 error: {resp.text[:200]}")
-                    return [start, end]
+                    return None
                 resp.raise_for_status()
                 data = resp.json()
                 break
@@ -88,7 +92,7 @@ class ValhallaRouter:
                     time.sleep(wait)
                 else:
                     logger.warning(f"Valhalla request failed after {max_retries} retries: {e}")
-                    return [start, end]
+                    return None
 
         # Extract the shape from the response
         try:
@@ -96,7 +100,7 @@ class ValhallaRouter:
             return self._decode_polyline(shape)
         except (KeyError, IndexError) as e:
             logger.warning(f"Valhalla response parsing failed: {e}")
-            return [start, end]
+            return None
 
     @staticmethod
     def _decode_polyline(encoded: str, precision: int = 6) -> list[tuple[float, float]]:
@@ -128,6 +132,9 @@ class ValhallaRouter:
     ) -> list[tuple[float, float]]:
         """Route through all waypoints sequentially.
 
+        If Valhalla fails for a segment, automatically falls back to OSRM.
+        If both fail, uses a straight line but warns loudly.
+
         Args:
             waypoints: (N, 2) array of (lat, lon) waypoints.
 
@@ -137,27 +144,78 @@ class ValhallaRouter:
         cache_key = self._cache_key(waypoints)
         cached = self._load_cache(cache_key)
         if cached is not None:
-            logger.info("Using cached route")
-            return cached
+            # Reject cached straight-line results (route should have more
+            # points than the input waypoints if it was actually routed).
+            if len(cached) > len(waypoints) * 1.5:
+                logger.info("Using cached route (%d points)", len(cached))
+                return cached
+            logger.warning(
+                "Cached route looks unrouted (%d points for %d waypoints) "
+                "— re-routing.",
+                len(cached), len(waypoints),
+            )
+
+        # Lazy-init an OSRM fallback router
+        osrm_fallback = OSRMRouter(
+            profile="bike",
+            request_delay=self.request_delay,
+        )
 
         full_route: list[tuple[float, float]] = []
+        n_segments = len(waypoints) - 1
+        routed_count = 0
+        fallback_count = 0
+        straight_count = 0
 
-        for i in range(len(waypoints) - 1):
+        for i in range(n_segments):
             start = (float(waypoints[i, 0]), float(waypoints[i, 1]))
             end = (float(waypoints[i + 1, 0]), float(waypoints[i + 1, 1]))
 
+            # Try Valhalla first
             segment = self.route_segment(start, end)
+
+            # Fallback to OSRM if Valhalla failed
+            if segment is None:
+                segment = osrm_fallback.route_segment(start, end)
+                if segment is not None:
+                    fallback_count += 1
+                else:
+                    # Both routers failed — straight line as last resort
+                    segment = [start, end]
+                    straight_count += 1
+            else:
+                routed_count += 1
 
             if full_route and segment:
                 full_route.extend(segment[1:])
             else:
                 full_route.extend(segment)
 
-            if self.request_delay > 0 and i < len(waypoints) - 2:
+            if self.request_delay > 0 and i < n_segments - 1:
                 time.sleep(self.request_delay)
 
             if (i + 1) % 10 == 0:
-                logger.info(f"  Routed {i + 1}/{len(waypoints) - 1} segments")
+                logger.info(f"  Routed {i + 1}/{n_segments} segments")
+
+        # Report routing quality
+        if straight_count == n_segments:
+            logger.error(
+                "ALL %d segments fell back to straight lines — "
+                "neither Valhalla nor OSRM was reachable. "
+                "The route will NOT follow real roads.",
+                n_segments,
+            )
+        elif straight_count > 0:
+            logger.warning(
+                "%d/%d segments used straight-line fallback "
+                "(Valhalla routed %d, OSRM routed %d)",
+                straight_count, n_segments, routed_count, fallback_count,
+            )
+        else:
+            logger.info(
+                "Routed %d segments (Valhalla: %d, OSRM fallback: %d)",
+                n_segments, routed_count, fallback_count,
+            )
 
         self._save_cache(cache_key, full_route)
         logger.info(f"Routed {len(waypoints)} waypoints → {len(full_route)} route points")
@@ -221,8 +279,12 @@ class OSRMRouter:
 
     def route_segment(
         self, start: tuple[float, float], end: tuple[float, float]
-    ) -> list[tuple[float, float]]:
-        """Route between two points (lat, lon) via OSRM."""
+    ) -> list[tuple[float, float]] | None:
+        """Route between two points (lat, lon) via OSRM.
+
+        Returns the routed path, or *None* if the server could not
+        produce a route.
+        """
         coords = f"{start[1]},{start[0]};{end[1]},{end[0]}"
         url = f"{self.base_url}/route/v1/{self.profile}/{coords}"
         params = {"overview": "full", "geometries": "geojson"}
@@ -241,11 +303,11 @@ class OSRMRouter:
                     time.sleep(wait)
                 else:
                     logger.warning(f"OSRM request failed after {max_retries} retries: {e}")
-                    return [start, end]
+                    return None
 
         if data.get("code") != "Ok" or not data.get("routes"):
             logger.warning(f"OSRM returned no route: {data.get('code')}")
-            return [start, end]
+            return None
 
         geometry = data["routes"][0]["geometry"]["coordinates"]
         return [(pt[1], pt[0]) for pt in geometry]
@@ -257,24 +319,47 @@ class OSRMRouter:
         cache_key = self._cache_key(waypoints)
         cached = self._load_cache(cache_key)
         if cached is not None:
-            logger.info("Using cached route")
-            return cached
+            if len(cached) > len(waypoints) * 1.5:
+                logger.info("Using cached route (%d points)", len(cached))
+                return cached
+            logger.warning(
+                "Cached route looks unrouted (%d points for %d waypoints) "
+                "— re-routing.",
+                len(cached), len(waypoints),
+            )
 
         full_route: list[tuple[float, float]] = []
+        n_segments = len(waypoints) - 1
+        straight_count = 0
 
-        for i in range(len(waypoints) - 1):
+        for i in range(n_segments):
             start = (float(waypoints[i, 0]), float(waypoints[i, 1]))
             end = (float(waypoints[i + 1, 0]), float(waypoints[i + 1, 1]))
 
             segment = self.route_segment(start, end)
+            if segment is None:
+                segment = [start, end]
+                straight_count += 1
 
             if full_route and segment:
                 full_route.extend(segment[1:])
             else:
                 full_route.extend(segment)
 
-            if self.request_delay > 0 and i < len(waypoints) - 2:
+            if self.request_delay > 0 and i < n_segments - 1:
                 time.sleep(self.request_delay)
+
+        if straight_count == n_segments:
+            logger.error(
+                "ALL %d segments fell back to straight lines — "
+                "OSRM was not reachable. The route will NOT follow real roads.",
+                n_segments,
+            )
+        elif straight_count > 0:
+            logger.warning(
+                "%d/%d segments used straight-line fallback",
+                straight_count, n_segments,
+            )
 
         self._save_cache(cache_key, full_route)
         logger.info(f"Routed {len(waypoints)} waypoints → {len(full_route)} route points")
