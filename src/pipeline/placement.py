@@ -109,6 +109,7 @@ def grid_search(
     num_scales: int = 5,
     num_rotations: int = 8,
     scale_range_km: tuple[float, float] = (0.3, 5.0),
+    max_rotation_deg: float = 90.0,
 ) -> list[tuple[Placement, np.ndarray]]:
     """Search over position/scale/rotation for best outline placements.
 
@@ -119,6 +120,8 @@ def grid_search(
         num_scales: Number of scale values to try.
         num_rotations: Number of rotation angles to try.
         scale_range_km: (min_km, max_km) for outline footprint.
+        max_rotation_deg: Maximum rotation in either direction (default ±90°).
+            Set to 180 for full rotation, 90 to prevent upside-down shapes.
 
     Returns:
         List of (Placement, geo_contour) tuples, sorted by score (descending).
@@ -136,7 +139,8 @@ def grid_search(
     )
 
     scales = np.linspace(scale_range_km[0], scale_range_km[1], num_scales)
-    rotations = np.linspace(0, 360, num_rotations, endpoint=False)
+    # Limit rotation range to avoid upside-down shapes
+    rotations = np.linspace(-max_rotation_deg, max_rotation_deg, num_rotations)
 
     results: list[tuple[Placement, np.ndarray]] = []
 

@@ -5,7 +5,10 @@ from __future__ import annotations
 from pathlib import Path
 
 
-def load_concepts(filepath: str | Path = "data/concepts.txt") -> list[str]:
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+
+
+def load_concepts(filepath: str | Path | None = None) -> list[str]:
     """Load concept words from a text file (one per line).
 
     Args:
@@ -14,6 +17,8 @@ def load_concepts(filepath: str | Path = "data/concepts.txt") -> list[str]:
     Returns:
         List of concept strings.
     """
+    if filepath is None:
+        filepath = PROJECT_ROOT / "data" / "concepts.txt"
     filepath = Path(filepath)
     concepts = []
     with open(filepath) as f:

@@ -57,6 +57,32 @@ class ValhallaRouter:
         with open(cache_file, "w") as f:
             json.dump(route, f)
 
+    def _segment_cache_key(
+        self, start: tuple[float, float], end: tuple[float, float]
+    ) -> str:
+        """Cache key for a single segment (pair of points + costing)."""
+        data = f"{start[0]:.6f},{start[1]:.6f}-{end[0]:.6f},{end[1]:.6f}-{self.costing}"
+        return "seg_" + hashlib.sha256(data.encode()).hexdigest()[:16]
+
+    def _load_segment_cache(
+        self, start: tuple[float, float], end: tuple[float, float]
+    ) -> list[tuple[float, float]] | None:
+        key = self._segment_cache_key(start, end)
+        cache_file = self.cache_dir / f"{key}.json"
+        if cache_file.exists():
+            with open(cache_file) as f:
+                return [tuple(p) for p in json.load(f)]
+        return None
+
+    def _save_segment_cache(
+        self, start: tuple[float, float], end: tuple[float, float],
+        segment: list[tuple[float, float]],
+    ) -> None:
+        key = self._segment_cache_key(start, end)
+        cache_file = self.cache_dir / f"{key}.json"
+        with open(cache_file, "w") as f:
+            json.dump(segment, f)
+
     def route_segment(
         self, start: tuple[float, float], end: tuple[float, float]
     ) -> list[tuple[float, float]] | None:
@@ -65,6 +91,11 @@ class ValhallaRouter:
         Returns the routed path, or *None* if the server could not
         produce a route (caller should try a fallback).
         """
+        # Check segment cache first
+        cached = self._load_segment_cache(start, end)
+        if cached is not None:
+            return cached
+
         url = f"{self.base_url}/route"
         payload = {
             "locations": [
@@ -97,7 +128,10 @@ class ValhallaRouter:
         # Extract the shape from the response
         try:
             shape = data["trip"]["legs"][0]["shape"]
-            return self._decode_polyline(shape)
+            points = self._decode_polyline(shape)
+            # Cache the successful segment result
+            self._save_segment_cache(start, end, points)
+            return points
         except (KeyError, IndexError) as e:
             logger.warning(f"Valhalla response parsing failed: {e}")
             return None
@@ -277,6 +311,31 @@ class OSRMRouter:
         with open(cache_file, "w") as f:
             json.dump(route, f)
 
+    def _segment_cache_key(
+        self, start: tuple[float, float], end: tuple[float, float]
+    ) -> str:
+        data = f"{start[0]:.6f},{start[1]:.6f}-{end[0]:.6f},{end[1]:.6f}-{self.profile}"
+        return "seg_osrm_" + hashlib.sha256(data.encode()).hexdigest()[:16]
+
+    def _load_segment_cache(
+        self, start: tuple[float, float], end: tuple[float, float]
+    ) -> list[tuple[float, float]] | None:
+        key = self._segment_cache_key(start, end)
+        cache_file = self.cache_dir / f"{key}.json"
+        if cache_file.exists():
+            with open(cache_file) as f:
+                return [tuple(p) for p in json.load(f)]
+        return None
+
+    def _save_segment_cache(
+        self, start: tuple[float, float], end: tuple[float, float],
+        segment: list[tuple[float, float]],
+    ) -> None:
+        key = self._segment_cache_key(start, end)
+        cache_file = self.cache_dir / f"{key}.json"
+        with open(cache_file, "w") as f:
+            json.dump(segment, f)
+
     def route_segment(
         self, start: tuple[float, float], end: tuple[float, float]
     ) -> list[tuple[float, float]] | None:
@@ -285,6 +344,11 @@ class OSRMRouter:
         Returns the routed path, or *None* if the server could not
         produce a route.
         """
+        # Check segment cache first
+        cached = self._load_segment_cache(start, end)
+        if cached is not None:
+            return cached
+
         coords = f"{start[1]},{start[0]};{end[1]},{end[0]}"
         url = f"{self.base_url}/route/v1/{self.profile}/{coords}"
         params = {"overview": "full", "geometries": "geojson"}
@@ -310,7 +374,9 @@ class OSRMRouter:
             return None
 
         geometry = data["routes"][0]["geometry"]["coordinates"]
-        return [(pt[1], pt[0]) for pt in geometry]
+        points = [(pt[1], pt[0]) for pt in geometry]
+        self._save_segment_cache(start, end, points)
+        return points
 
     def route_waypoints(
         self, waypoints: np.ndarray

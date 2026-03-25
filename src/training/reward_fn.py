@@ -7,6 +7,9 @@ into a callable that the DDPO trainer can use.
 from __future__ import annotations
 
 import logging
+import os
+import time
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -14,11 +17,14 @@ from PIL import Image
 
 from src.pipeline.edge_detect import process_image
 from src.pipeline.placement import BBox, grid_search
-from src.pipeline.waypoints import sample_uniform_waypoints
+from src.pipeline.waypoints import sample_adaptive_waypoints, densify_waypoints
 from src.pipeline.routing import ValhallaRouter
 from src.evaluation.reward import RewardFunction
 
 logger = logging.getLogger(__name__)
+
+# Directory for saving sample images during training
+TRAIN_SAMPLES_DIR = Path(os.environ.get("TRAIN_SAMPLES_DIR", "training_samples"))
 
 
 class DDPORewardWrapper:
@@ -33,13 +39,15 @@ class DDPORewardWrapper:
         bbox: BBox | None = None,
         router: ValhallaRouter | None = None,
         reward_fn: RewardFunction | None = None,
-        num_waypoints: int = 65,
+        num_waypoints: int = 80,
         num_positions: int = 10,
         num_scales: int = 5,
         num_rotations: int = 8,
         scale_range_km: tuple[float, float] = (0.3, 5.0),
         canny_low: int = 50,
         canny_high: int = 150,
+        curvature_weight: float = 2.0,
+        max_gap_km: float = 0.15,
     ):
         # Default SF bounding box
         self.bbox = bbox or BBox(
@@ -55,6 +63,8 @@ class DDPORewardWrapper:
         self.scale_range_km = scale_range_km
         self.canny_low = canny_low
         self.canny_high = canny_high
+        self.curvature_weight = curvature_weight
+        self.max_gap_km = max_gap_km
 
     def __call__(
         self,
@@ -75,6 +85,20 @@ class DDPORewardWrapper:
         results = []
         for image, concept in zip(images, concepts):
             try:
+                # DDPO may pass GPU tensors — convert to PIL
+                if not isinstance(image, Image.Image):
+                    import torch
+                    if isinstance(image, torch.Tensor):
+                        img_np = image.detach().cpu().float()
+                        # Handle (C, H, W) or (H, W, C) formats
+                        if img_np.ndim == 3 and img_np.shape[0] in (1, 3, 4):
+                            img_np = img_np.permute(1, 2, 0)
+                        # Normalize to 0-255
+                        if img_np.max() <= 1.0:
+                            img_np = (img_np * 255).clamp(0, 255)
+                        image = Image.fromarray(img_np.numpy().astype(np.uint8))
+                    else:
+                        image = Image.fromarray(np.array(image))
                 result = self._compute_single(image, concept)
             except Exception as e:
                 logger.error(f"Reward computation failed for '{concept}': {e}")
@@ -85,14 +109,23 @@ class DDPORewardWrapper:
     def _compute_single(
         self, image: Image.Image, concept: str
     ) -> dict[str, float]:
-        """Compute reward for a single image."""
-        # Step 1: Edge detection
+        """Compute reward for a single image.
+
+        Returns dict with scores and optionally intermediate images for logging.
+        """
+        t0 = time.time()
+
+        # Step 1: Edge detection + silhouette contour
         edges, contour = process_image(
             image, self.canny_low, self.canny_high
         )
         if contour is None:
             logger.warning(f"No contour found for '{concept}'")
             return {"clip_score": 0.0, "chamfer_score": 0.0, "reward": 0.0}
+
+        # Get raw pixel contour (before normalization) for visualization
+        from src.pipeline.edge_detect import extract_silhouette_contour
+        pixel_contour = extract_silhouette_contour(image)
 
         # Step 2: Grid search for best placement
         placements = grid_search(
@@ -106,15 +139,17 @@ class DDPORewardWrapper:
             logger.warning(f"No valid placements found for '{concept}'")
             return {"clip_score": 0.0, "chamfer_score": 0.0, "reward": 0.0}
 
-        # Take the best placement
         best_placement, geo_contour = placements[0]
 
-        # Step 3: Sample waypoints
-        waypoints = sample_uniform_waypoints(
-            geo_contour, num_points=self.num_waypoints
+        # Step 3: Sample waypoints (adaptive: more at sharp corners)
+        waypoints = sample_adaptive_waypoints(
+            geo_contour,
+            num_points=self.num_waypoints,
+            curvature_weight=self.curvature_weight,
         )
+        waypoints = densify_waypoints(waypoints, max_gap_km=self.max_gap_km)
 
-        # Step 4: Route via OSRM
+        # Step 4: Route via routing engine
         route = self.router.route_waypoints(waypoints)
 
         if len(route) < 2:
@@ -122,4 +157,30 @@ class DDPORewardWrapper:
             return {"clip_score": 0.0, "chamfer_score": 0.0, "reward": 0.0}
 
         # Step 5: Compute reward
-        return self.reward_fn.compute(route, concept, edges)
+        result = self.reward_fn.compute(route, concept, edges)
+
+        elapsed = time.time() - t0
+        logger.info(
+            f"  [{concept}] reward={result['reward']:.3f} "
+            f"(clip={result['clip_score']:.3f}, chamfer={result['chamfer_score']:.3f}) "
+            f"route_pts={len(route)} time={elapsed:.1f}s"
+        )
+
+        # Attach intermediate artifacts for W&B logging
+        result["_image"] = image  # generated silhouette
+        result["_edges"] = Image.fromarray(edges)  # Canny edge map
+        result["_route"] = route  # routed path
+        result["_concept"] = concept
+        result["_num_contour_points"] = len(contour)
+        result["_num_waypoints"] = len(waypoints)
+        result["_num_route_points"] = len(route)
+        result["_placement"] = best_placement
+
+        # Create contour overlay using raw pixel contour (not normalized)
+        if pixel_contour is not None:
+            import cv2 as _cv2
+            vis = np.array(image.copy().convert("RGB"))
+            _cv2.drawContours(vis, [pixel_contour], -1, (255, 0, 0), 2)
+            result["_contour_overlay"] = Image.fromarray(vis)
+
+        return result

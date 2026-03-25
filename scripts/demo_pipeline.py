@@ -41,6 +41,7 @@ def create_star_silhouette(size: int = 512) -> Image.Image:
     return img
 
 
+
 def create_heart_silhouette(size: int = 512) -> Image.Image:
     """Create a programmatic heart silhouette."""
     img = Image.new("RGB", (size, size), (255, 255, 255))
