@@ -3,10 +3,11 @@
 # Image generation
 image_gen:
   model_id: "runwayml/stable-diffusion-v1-5"
-  prompt_template: "a simple black silhouette of a {concept} on a white background, minimal, clean outline, no background details"
+  prompt_template: "simple 2d black silhouette of a {concept}, full body, solid filled shape on plain white background, flat graphic, logo style, no detail, no shading"
+  negative_prompt: "3d, depth, perspective, realistic, photograph, detailed, complex, intricate, outline, lines, strokes, sketch, hatching, texture, shading, gradient, gray, person, people, human, hands, text, watermark, color, multiple objects, cropped, partial, head only, close up, blurry, noise"
   image_size: 512
-  num_inference_steps: 10  # reduced for CPU; bump to 30 for GPU/Modal
-  guidance_scale: 7.5
+  num_inference_steps: 30  # 30 steps needed for clean silhouettes (use GPU/Modal)
+  guidance_scale: 8.0  # 8 is sweet spot for SD 1.5 silhouettes (10+ causes artifacts)
 
 # Edge detection
 edge_detect:
@@ -16,11 +17,11 @@ edge_detect:
 
 # Placement grid search
 placement:
-  num_positions: 10
+  num_positions: 25  # 5x5 grid across SF (was 10 = 3x3)
   num_scales: 5
   num_rotations: 8
   scale_range_km: [0.3, 5.0]  # min/max footprint in km
-  max_rotation_deg: 90  # ±90° prevents upside-down shapes
+  max_rotation_deg: 15  # ±15° keeps shapes upright with minimal tilt
 
 # Waypoint sampling
 waypoints:
@@ -28,26 +29,37 @@ waypoints:
   curvature_weight: 2.0  # bias toward high-curvature areas (0 = uniform)
   max_gap_km: 0.15  # densify: max 150m between waypoints so router follows roads
 
-# San Francisco bounding box (default: all of SF)
+# Multi-contour (include internal details like eyes, windows)
+multi_contour:
+  enabled: true
+  min_inner_area_ratio: 0.005  # minimum inner contour area as fraction of outer
+  max_inner_contours: 5
+  outer_budget_min: 0.6  # minimum fraction of waypoint budget for outer
+  min_inner_waypoints: 4
+
+# San Francisco bounding box (expanded: Potrero Hill to Presidio)
 sf_bbox:
-  min_lat: 37.7080
-  max_lat: 37.8120
-  min_lon: -122.5150
-  max_lon: -122.3570
+  min_lat: 37.7350
+  max_lat: 37.8050
+  min_lon: -122.4700
+  max_lon: -122.3850
 
 # Routing (Valhalla is default, OSRM as fallback)
 routing:
-  backend: "valhalla"  # "valhalla" or "osrm"
+  backend: "graph"  # "graph" (local, instant) or "valhalla" (API, slow) or "osrm"
+  graph_path: "data/sf_bike_graph.graphml"
   valhalla_url: "https://valhalla1.openstreetmap.de"
   valhalla_costing: "bicycle"
   osrm_url: "https://router.project-osrm.org"
   osrm_profile: "driving"
-  request_delay: 1.0  # seconds between requests (rate limiting for public server)
+  request_delay: 1.0
+  parallel: true
+  max_concurrent: 10
 
 # Evaluation
 evaluation:
   clip_model: "openai/clip-vit-base-patch32"
-  clip_prompt_template: "a bike route shaped like a {concept}"
+  clip_prompt_template: "a GPS bike route on a map that traces the outline of a {concept}"
   reward_clip_weight: 0.7
   reward_chamfer_weight: 0.3
   render_size: 512
@@ -57,10 +69,8 @@ training:
   num_epochs: 100
   batch_size: 4
   learning_rate: 1.0e-5
-  kl_penalty: 0.1
   num_samples_per_concept: 4
   save_every: 10  # save checkpoint every N epochs
-  log_images_every: 5
 
 # Logging
 logging:

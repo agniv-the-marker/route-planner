@@ -97,6 +97,12 @@ def create_reward_fn(config: dict):
         canny_high=config["edge_detect"]["canny_high"],
         curvature_weight=waypoint_cfg.get("curvature_weight", 2.0),
         max_gap_km=waypoint_cfg.get("max_gap_km", 0.15),
+        max_rotation_deg=placement_cfg.get("max_rotation_deg", 15.0),
+        multi_contour=config.get("multi_contour", {}).get("enabled", True),
+        min_inner_area_ratio=config.get("multi_contour", {}).get("min_inner_area_ratio", 0.005),
+        max_inner_contours=config.get("multi_contour", {}).get("max_inner_contours", 5),
+        outer_budget_min=config.get("multi_contour", {}).get("outer_budget_min", 0.6),
+        min_inner_waypoints=config.get("multi_contour", {}).get("min_inner_waypoints", 4),
     )
 
 
@@ -172,12 +178,16 @@ def train(config_path: str = "configs/default.yaml"):
                         wandb.Image(r["_contour_overlay"], caption=f"{concept} contour ({n_pts} pts)")
                     )
 
-                # Log route polyline render
+                # Log route polyline and styled map view
                 if "_route" in r and len(r["_route"]) > 2:
-                    from src.evaluation.render import render_polyline
+                    from src.evaluation.render import render_polyline, _render_styled_polyline
                     polyline_img = render_polyline(r["_route"])
                     images_to_log.append(
                         wandb.Image(polyline_img, caption=f"{concept} route ({r['_num_route_points']} pts)")
+                    )
+                    map_img = _render_styled_polyline(r["_route"], size=512)
+                    images_to_log.append(
+                        wandb.Image(map_img, caption=f"{concept} map (r={r['reward']:.3f})")
                     )
 
             if images_to_log:
@@ -226,9 +236,11 @@ def train(config_path: str = "configs/default.yaml"):
             if "_contour_overlay" in r:
                 r["_contour_overlay"].save(str(prefix) + "_contour.png")
             if "_route" in r and len(r["_route"]) > 2:
-                from src.evaluation.render import render_polyline
+                from src.evaluation.render import render_polyline, _render_styled_polyline
                 polyline_img = render_polyline(r["_route"])
                 polyline_img.save(str(prefix) + "_route.png")
+                map_img = _render_styled_polyline(r["_route"], size=512)
+                map_img.save(str(prefix) + "_map.png")
 
         # Update metadata with scores
         for m, r in zip(metadata, results):

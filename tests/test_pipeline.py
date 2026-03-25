@@ -176,3 +176,100 @@ def test_densify_waypoints_no_change():
     ])
     densified = densify_waypoints(waypoints, max_gap_km=0.2)
     assert len(densified) == 3
+
+
+# --- Multi-contour tests ---
+
+def test_extract_contour_set():
+    """Extract outer + inner contour from image with a hole."""
+    from src.pipeline.edge_detect import extract_contour_set
+    from PIL import Image, ImageDraw
+
+    img = Image.new("RGB", (256, 256), (255, 255, 255))
+    draw = ImageDraw.Draw(img)
+    draw.ellipse([40, 40, 200, 200], fill=(0, 0, 0))  # outer
+    draw.ellipse([90, 90, 140, 130], fill=(255, 255, 255))  # inner hole
+
+    cs = extract_contour_set(img)
+    assert cs is not None
+    assert len(cs.outer) > 10
+    assert len(cs.inner) >= 1
+    assert cs.inner_areas[0] > 0
+
+
+def test_normalize_contour_set():
+    """Normalized inner contour stays within outer's [0,1] bounds."""
+    from src.pipeline.edge_detect import extract_contour_set, normalize_contour_set
+    from PIL import Image, ImageDraw
+
+    img = Image.new("RGB", (256, 256), (255, 255, 255))
+    draw = ImageDraw.Draw(img)
+    draw.ellipse([40, 40, 200, 200], fill=(0, 0, 0))
+    draw.ellipse([90, 90, 140, 130], fill=(255, 255, 255))
+
+    cs = extract_contour_set(img)
+    ncs = normalize_contour_set(cs)
+
+    # Outer spans [0, 1]
+    assert ncs.outer[:, 0].min() >= -0.01
+    assert ncs.outer[:, 0].max() <= 1.01
+    # Inner is inside outer bounds
+    assert ncs.inner[0][:, 0].min() > 0.1
+    assert ncs.inner[0][:, 0].max() < 0.9
+
+
+def test_allocate_waypoint_budget():
+    """Budget allocation respects constraints."""
+    from src.pipeline.waypoints import allocate_waypoint_budget
+
+    outer_n, inner_ns = allocate_waypoint_budget(
+        outer_perimeter=100, inner_perimeters=[20, 10],
+        total_budget=80, outer_budget_min=0.6, min_inner_waypoints=4,
+    )
+    assert outer_n >= 48  # 60% of 80
+    assert all(n >= 4 for n in inner_ns)
+    assert outer_n + sum(inner_ns) <= 100  # reasonable bound
+
+
+def test_build_bridged_path():
+    """Bridged path visits all contour waypoints."""
+    from src.pipeline.waypoints import build_bridged_path
+
+    # Outer: square
+    outer = np.array([
+        [0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0],
+        [0.0, 0.0],  # closed
+    ])
+    # Inner: small square inside
+    inner = np.array([
+        [0.3, 0.3], [0.6, 0.3], [0.6, 0.6], [0.3, 0.6],
+        [0.3, 0.3],  # closed
+    ])
+
+    path = build_bridged_path(outer, [inner])
+
+    assert len(path) > len(outer)  # path is longer (includes inner detour)
+    # Path should contain points from both outer and inner
+    assert path.shape[1] == 2
+
+
+def test_grid_search_contour_set():
+    """Grid search works with ContourSet input."""
+    from src.pipeline.edge_detect import ContourSet
+    from src.pipeline.placement import BBox, grid_search
+
+    outer = np.array([
+        [0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0],
+    ])
+    inner = np.array([
+        [0.3, 0.3], [0.6, 0.3], [0.6, 0.6], [0.3, 0.6],
+    ])
+    cs = ContourSet(outer=outer, inner=[inner], inner_areas=[0.09])
+
+    bbox = BBox(min_lat=37.708, max_lat=37.812, min_lon=-122.515, max_lon=-122.357)
+    results = grid_search(cs, bbox, num_positions=4, num_scales=2, num_rotations=2)
+
+    assert len(results) > 0
+    placement, geo_cs = results[0]
+    assert isinstance(geo_cs, ContourSet)
+    assert len(geo_cs.inner) == 1

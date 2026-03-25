@@ -220,3 +220,165 @@ def densify_waypoints(
         result.append(p2)
 
     return np.array(result)
+
+
+def allocate_waypoint_budget(
+    outer_perimeter: float,
+    inner_perimeters: list[float],
+    total_budget: int = 80,
+    outer_budget_min: float = 0.6,
+    min_inner_waypoints: int = 4,
+) -> tuple[int, list[int]]:
+    """Allocate waypoint budget across outer and inner contours.
+
+    Returns (outer_count, [inner_count_1, inner_count_2, ...]).
+    """
+    if not inner_perimeters:
+        return total_budget, []
+
+    total_perim = outer_perimeter + sum(inner_perimeters)
+    if total_perim == 0:
+        return total_budget, [min_inner_waypoints] * len(inner_perimeters)
+
+    # Proportional allocation
+    outer_prop = int(total_budget * outer_perimeter / total_perim)
+    outer_count = max(int(total_budget * outer_budget_min), outer_prop)
+
+    remaining = total_budget - outer_count
+    inner_counts = []
+    for p in inner_perimeters:
+        prop = max(min_inner_waypoints, int(remaining * p / max(sum(inner_perimeters), 1e-9)))
+        inner_counts.append(prop)
+
+    # Scale down if over budget
+    inner_total = sum(inner_counts)
+    if inner_total > remaining and inner_total > 0:
+        scale = remaining / inner_total
+        inner_counts = [max(min_inner_waypoints, int(c * scale)) for c in inner_counts]
+
+    return outer_count, inner_counts
+
+
+def build_bridged_path(
+    outer_waypoints: np.ndarray,
+    inner_waypoint_lists: list[np.ndarray],
+) -> np.ndarray:
+    """Stitch outer + inner contour waypoints into a single connected path.
+
+    For each inner contour, finds the closest point on the outer contour,
+    inserts a bridge (out to inner, trace inner loop, bridge back), then
+    continues along the outer contour.
+
+    Args:
+        outer_waypoints: (N, 2) waypoints along the outer contour (closed loop).
+        inner_waypoint_lists: List of (M_i, 2) waypoints for each inner contour.
+
+    Returns:
+        (P, 2) single connected path array.
+    """
+    if not inner_waypoint_lists:
+        return outer_waypoints
+
+    from scipy.spatial import cKDTree
+
+    n_outer = len(outer_waypoints)
+
+    # For each inner contour, find the closest outer waypoint
+    outer_tree = cKDTree(outer_waypoints)
+    bridges = []  # (outer_idx, inner_waypoints, inner_entry_idx)
+
+    for inner_wps in inner_waypoint_lists:
+        if len(inner_wps) < 2:
+            continue
+        # Find closest pair
+        dists, outer_indices = outer_tree.query(inner_wps)
+        best_inner_idx = int(np.argmin(dists))
+        best_outer_idx = int(outer_indices[best_inner_idx])
+        bridges.append((best_outer_idx, inner_wps, best_inner_idx))
+
+    if not bridges:
+        return outer_waypoints
+
+    # Sort bridges by outer index (order of encounter along outer boundary)
+    bridges.sort(key=lambda b: b[0])
+
+    # Build the unified path
+    path = []
+    outer_pos = 0
+
+    for outer_idx, inner_wps, inner_entry_idx in bridges:
+        # Add outer waypoints up to the bridge point
+        if outer_idx >= outer_pos:
+            path.extend(outer_waypoints[outer_pos:outer_idx + 1].tolist())
+        outer_pos = outer_idx + 1
+
+        # Bridge to inner contour
+        n_inner = len(inner_wps)
+        # Trace inner contour starting from entry point, full loop
+        for j in range(n_inner):
+            idx = (inner_entry_idx + j) % n_inner
+            path.append(inner_wps[idx].tolist())
+        # Close the inner loop back to entry
+        path.append(inner_wps[inner_entry_idx].tolist())
+
+        # Bridge back to outer contour
+        path.append(outer_waypoints[min(outer_idx, n_outer - 1)].tolist())
+
+    # Add remaining outer waypoints
+    if outer_pos < n_outer:
+        path.extend(outer_waypoints[outer_pos:].tolist())
+
+    return np.array(path)
+
+
+def sample_multi_contour_waypoints(
+    contour_set: "ContourSet",
+    num_points: int = 80,
+    curvature_weight: float = 2.0,
+    outer_budget_min: float = 0.6,
+    min_inner_waypoints: int = 4,
+    max_gap_km: float = 0.15,
+) -> np.ndarray:
+    """Sample waypoints from a ContourSet using bridge-and-trace.
+
+    Traces the outer boundary with detours into inner features,
+    producing a single connected waypoint path.
+    """
+    outer = contour_set.outer
+    inner_contours = contour_set.inner
+
+    # Compute perimeters for budget allocation
+    outer_perim = float(compute_arc_lengths(outer)[-1]) if len(outer) > 1 else 0
+    inner_perims = [
+        float(compute_arc_lengths(c)[-1]) if len(c) > 1 else 0
+        for c in inner_contours
+    ]
+
+    outer_budget, inner_budgets = allocate_waypoint_budget(
+        outer_perim, inner_perims,
+        total_budget=num_points,
+        outer_budget_min=outer_budget_min,
+        min_inner_waypoints=min_inner_waypoints,
+    )
+
+    # Sample each contour independently
+    outer_wps = sample_adaptive_waypoints(
+        outer, num_points=outer_budget, curvature_weight=curvature_weight, close_loop=True
+    )
+
+    inner_wps_list = []
+    for c, budget in zip(inner_contours, inner_budgets):
+        if len(c) < 3:
+            continue
+        wps = sample_adaptive_waypoints(
+            c, num_points=budget, curvature_weight=curvature_weight, close_loop=True
+        )
+        inner_wps_list.append(wps)
+
+    # Stitch into single path
+    bridged = build_bridged_path(outer_wps, inner_wps_list)
+
+    # Densify the final path
+    bridged = densify_waypoints(bridged, max_gap_km=max_gap_km)
+
+    return bridged

@@ -32,6 +32,7 @@ def create_app(config_path: str = "configs/default.yaml"):
             _components["generator"] = ImageGenerator(
                 model_id=cfg.get("inference", {}).get("checkpoint") or gen_cfg["model_id"],
                 prompt_template=gen_cfg["prompt_template"],
+                negative_prompt=gen_cfg.get("negative_prompt", ""),
                 image_size=gen_cfg["image_size"],
                 num_inference_steps=gen_cfg["num_inference_steps"],
                 guidance_scale=gen_cfg["guidance_scale"],
@@ -54,11 +55,14 @@ def create_app(config_path: str = "configs/default.yaml"):
         max_lat: float,
         max_lon: float,
         seed: int | None,
+        use_multi_contour: bool = True,
     ):
         """Generate a route for the given concept."""
-        from src.pipeline.edge_detect import process_image
+        from src.pipeline.edge_detect import ContourSet, process_image
         from src.pipeline.placement import BBox, grid_search
-        from src.pipeline.waypoints import sample_adaptive_waypoints, densify_waypoints
+        from src.pipeline.waypoints import (
+            sample_adaptive_waypoints, densify_waypoints, sample_multi_contour_waypoints,
+        )
         from src.pipeline.gpx_utils import route_to_gpx, save_gpx
         from src.evaluation.render import render_polyline, render_map_overlay
         from src.evaluation.chamfer import chamfer_score
@@ -69,6 +73,7 @@ def create_app(config_path: str = "configs/default.yaml"):
         router = components["router"]
         clip_scorer = components["clip_scorer"]
 
+        mc_cfg = cfg.get("multi_contour", {})
         bbox = BBox(min_lat=min_lat, max_lat=max_lat, min_lon=min_lon, max_lon=max_lon)
 
         # Generate image
@@ -77,16 +82,21 @@ def create_app(config_path: str = "configs/default.yaml"):
 
         # Edge detection
         edge_cfg = cfg["edge_detect"]
-        edges, contour = process_image(
-            image, edge_cfg["canny_low"], edge_cfg["canny_high"], edge_cfg["blur_kernel"]
+        edges, contour_data = process_image(
+            image, edge_cfg["canny_low"], edge_cfg["canny_high"], edge_cfg["blur_kernel"],
+            multi_contour=use_multi_contour,
+            min_inner_area_ratio=mc_cfg.get("min_inner_area_ratio", 0.005),
+            max_inner_contours=mc_cfg.get("max_inner_contours", 5),
         )
-        if contour is None:
+        if contour_data is None:
             return image, None, None, None, "No contour found in generated image."
+
+        is_multi = isinstance(contour_data, ContourSet)
 
         # Grid search
         p_cfg = cfg["placement"]
         placements = grid_search(
-            contour, bbox,
+            contour_data, bbox,
             num_positions=p_cfg["num_positions"],
             num_scales=p_cfg["num_scales"],
             num_rotations=p_cfg["num_rotations"],
@@ -95,21 +105,34 @@ def create_app(config_path: str = "configs/default.yaml"):
         if not placements:
             return image, None, None, None, "No valid placements found."
 
-        best, geo_contour = placements[0]
+        best, geo_data = placements[0]
 
         # Waypoints
         wp_cfg = cfg["waypoints"]
-        waypoints = sample_adaptive_waypoints(
-            geo_contour,
-            num_points=wp_cfg["num_points"],
-            curvature_weight=wp_cfg.get("curvature_weight", 2.0),
-        )
-        waypoints = densify_waypoints(
-            waypoints, max_gap_km=wp_cfg.get("max_gap_km", 0.15),
-        )
+        if is_multi and isinstance(geo_data, ContourSet):
+            waypoints = sample_multi_contour_waypoints(
+                geo_data,
+                num_points=wp_cfg["num_points"],
+                curvature_weight=wp_cfg.get("curvature_weight", 2.0),
+                outer_budget_min=mc_cfg.get("outer_budget_min", 0.6),
+                min_inner_waypoints=mc_cfg.get("min_inner_waypoints", 4),
+                max_gap_km=wp_cfg.get("max_gap_km", 0.15),
+            )
+        else:
+            waypoints = sample_adaptive_waypoints(
+                geo_data,
+                num_points=wp_cfg["num_points"],
+                curvature_weight=wp_cfg.get("curvature_weight", 2.0),
+            )
+            waypoints = densify_waypoints(
+                waypoints, max_gap_km=wp_cfg.get("max_gap_km", 0.15),
+            )
 
-        # Routing
-        route = router.route_waypoints(waypoints)
+        # Routing (parallel if available)
+        if hasattr(router, 'route_waypoints_parallel'):
+            route = router.route_waypoints_parallel(waypoints)
+        else:
+            route = router.route_waypoints(waypoints)
 
         if len(route) < 2:
             return image, None, None, None, "Routing failed."
@@ -148,6 +171,7 @@ def create_app(config_path: str = "configs/default.yaml"):
         return image, polyline_img, map_img, tmp.name, info
 
     # Build UI
+    mc_cfg = cfg.get("multi_contour", {})
     sf = cfg["sf_bbox"]
 
     with gr.Blocks(title="Route Sculptor") as app:
@@ -165,6 +189,10 @@ def create_app(config_path: str = "configs/default.yaml"):
                 max_lat = gr.Number(label="Max Latitude", value=sf["max_lat"])
                 max_lon = gr.Number(label="Max Longitude", value=sf["max_lon"])
 
+                multi_contour_cb = gr.Checkbox(
+                    label="Include internal details (eyes, etc.)",
+                    value=mc_cfg.get("enabled", True),
+                )
                 generate_btn = gr.Button("Generate Route", variant="primary")
 
             with gr.Column(scale=2):
@@ -178,7 +206,7 @@ def create_app(config_path: str = "configs/default.yaml"):
 
         generate_btn.click(
             fn=generate_route,
-            inputs=[concept_input, min_lat, min_lon, max_lat, max_lon, seed_input],
+            inputs=[concept_input, min_lat, min_lon, max_lat, max_lon, seed_input, multi_contour_cb],
             outputs=[gen_image, polyline_image, map_image, gpx_file, info_text],
         )
 

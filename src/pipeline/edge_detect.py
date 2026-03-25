@@ -70,9 +70,12 @@ def extract_silhouette_contour(
         (N, 2) array of contour points in pixel coordinates, or None.
     """
     gray = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2GRAY)
+    img_h, img_w = gray.shape
 
-    # Threshold: dark pixels (silhouette) become white in the mask
-    _, mask = cv2.threshold(gray, threshold, 255, cv2.THRESH_BINARY_INV)
+    # Use Otsu's threshold for robustness against gray backgrounds
+    otsu_thresh, mask = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    if otsu_thresh < 30 or otsu_thresh > 230:
+        _, mask = cv2.threshold(gray, threshold, 255, cv2.THRESH_BINARY_INV)
 
     # Light morphological close to fill small gaps (e.g. anti-aliasing holes)
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
@@ -82,10 +85,20 @@ def extract_silhouette_contour(
     if not contours:
         return None
 
-    # Filter out tiny contours (noise)
-    img_area = gray.shape[0] * gray.shape[1]
+    # Filter out tiny contours AND full-image boundary boxes
+    img_area = img_h * img_w
     min_area = img_area * min_area_ratio
-    valid = [c for c in contours if cv2.contourArea(c) > min_area]
+    valid = []
+    for c in contours:
+        area = cv2.contourArea(c)
+        if area < min_area:
+            continue
+        x, y, w, h = cv2.boundingRect(c)
+        if (w > img_w * 0.9) and (h > img_h * 0.9):
+            continue  # skip full-image boundary box
+        if area > img_area * 0.85:
+            continue  # skip contours covering nearly all pixels
+        valid.append(c)
     if not valid:
         return None
 
@@ -114,10 +127,19 @@ def extract_contour_set(
         ContourSet with outer + inner contours in pixel coords, or None.
     """
     gray = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2GRAY)
-    _, mask = cv2.threshold(gray, threshold, 255, cv2.THRESH_BINARY_INV)
+
+    # Use Otsu's method to auto-detect threshold (handles gray/noisy backgrounds)
+    # Falls back to fixed threshold if Otsu fails
+    otsu_thresh, mask = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    # If Otsu gives a weird threshold (too low or too high), use the fixed one
+    if otsu_thresh < 30 or otsu_thresh > 230:
+        _, mask = cv2.threshold(gray, threshold, 255, cv2.THRESH_BINARY_INV)
 
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
     mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel, iterations=1)
+
+    # Reject contours that span nearly the full image (background artifacts)
+    img_h, img_w = gray.shape
 
     # RETR_TREE gives full hierarchy: [next, prev, first_child, parent]
     contours, hierarchy = cv2.findContours(
@@ -128,11 +150,26 @@ def extract_contour_set(
 
     hierarchy = hierarchy[0]  # shape (N, 4)
 
-    # Find the largest contour (outer boundary)
+    # Find the largest contour that isn't a full-image boundary box
     areas = [cv2.contourArea(c) for c in contours]
     if max(areas) < 100:  # no meaningful contour
         return None
-    outer_idx = int(np.argmax(areas))
+
+    # Filter out contours that span >90% of the image (background artifacts)
+    img_area = img_h * img_w
+    valid_indices = []
+    for i, c in enumerate(contours):
+        x, y, w, h = cv2.boundingRect(c)
+        spans_full = (w > img_w * 0.9) and (h > img_h * 0.9)
+        too_big = areas[i] > img_area * 0.85
+        if not spans_full and not too_big:
+            valid_indices.append(i)
+
+    # If all contours were filtered, use the largest anyway as fallback
+    if not valid_indices:
+        valid_indices = list(range(len(contours)))
+
+    outer_idx = max(valid_indices, key=lambda i: areas[i])
     outer_contour = contours[outer_idx].reshape(-1, 2)
     outer_area = areas[outer_idx]
 

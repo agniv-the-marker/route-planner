@@ -15,9 +15,11 @@ from typing import Any
 import numpy as np
 from PIL import Image
 
-from src.pipeline.edge_detect import process_image
+from src.pipeline.edge_detect import ContourSet, process_image, extract_contour_set
 from src.pipeline.placement import BBox, grid_search
-from src.pipeline.waypoints import sample_adaptive_waypoints, densify_waypoints
+from src.pipeline.waypoints import (
+    sample_adaptive_waypoints, densify_waypoints, sample_multi_contour_waypoints,
+)
 from src.pipeline.routing import ValhallaRouter
 from src.evaluation.reward import RewardFunction
 
@@ -48,6 +50,12 @@ class DDPORewardWrapper:
         canny_high: int = 150,
         curvature_weight: float = 2.0,
         max_gap_km: float = 0.15,
+        max_rotation_deg: float = 15.0,
+        multi_contour: bool = True,
+        min_inner_area_ratio: float = 0.005,
+        max_inner_contours: int = 5,
+        outer_budget_min: float = 0.6,
+        min_inner_waypoints: int = 4,
     ):
         # Default SF bounding box
         self.bbox = bbox or BBox(
@@ -65,6 +73,12 @@ class DDPORewardWrapper:
         self.canny_high = canny_high
         self.curvature_weight = curvature_weight
         self.max_gap_km = max_gap_km
+        self.max_rotation_deg = max_rotation_deg
+        self.multi_contour = multi_contour
+        self.min_inner_area_ratio = min_inner_area_ratio
+        self.max_inner_contours = max_inner_contours
+        self.outer_budget_min = outer_budget_min
+        self.min_inner_waypoints = min_inner_waypoints
 
     def __call__(
         self,
@@ -115,42 +129,58 @@ class DDPORewardWrapper:
         """
         t0 = time.time()
 
-        # Step 1: Edge detection + silhouette contour
-        edges, contour = process_image(
-            image, self.canny_low, self.canny_high
+        # Step 1: Edge detection + contour extraction
+        edges, contour_data = process_image(
+            image, self.canny_low, self.canny_high,
+            multi_contour=self.multi_contour,
+            min_inner_area_ratio=self.min_inner_area_ratio,
+            max_inner_contours=self.max_inner_contours,
         )
-        if contour is None:
+        if contour_data is None:
             logger.warning(f"No contour found for '{concept}'")
             return {"clip_score": 0.0, "chamfer_score": 0.0, "reward": 0.0}
 
-        # Get raw pixel contour (before normalization) for visualization
-        from src.pipeline.edge_detect import extract_silhouette_contour
-        pixel_contour = extract_silhouette_contour(image)
-
-        # Step 2: Grid search for best placement
+        # Step 2: Grid search for best placement (handles both array and ContourSet)
         placements = grid_search(
-            contour, self.bbox,
+            contour_data, self.bbox,
             num_positions=self.num_positions,
             num_scales=self.num_scales,
             num_rotations=self.num_rotations,
             scale_range_km=self.scale_range_km,
+            max_rotation_deg=self.max_rotation_deg,
         )
         if not placements:
             logger.warning(f"No valid placements found for '{concept}'")
             return {"clip_score": 0.0, "chamfer_score": 0.0, "reward": 0.0}
 
-        best_placement, geo_contour = placements[0]
+        best_placement, geo_data = placements[0]
 
-        # Step 3: Sample waypoints (adaptive: more at sharp corners)
-        waypoints = sample_adaptive_waypoints(
-            geo_contour,
-            num_points=self.num_waypoints,
-            curvature_weight=self.curvature_weight,
-        )
-        waypoints = densify_waypoints(waypoints, max_gap_km=self.max_gap_km)
+        # Step 3: Sample waypoints
+        is_multi = isinstance(geo_data, ContourSet)
+        if is_multi:
+            n_inner = len(geo_data.inner)
+            waypoints = sample_multi_contour_waypoints(
+                geo_data,
+                num_points=self.num_waypoints,
+                curvature_weight=self.curvature_weight,
+                outer_budget_min=self.outer_budget_min,
+                min_inner_waypoints=self.min_inner_waypoints,
+                max_gap_km=self.max_gap_km,
+            )
+        else:
+            n_inner = 0
+            waypoints = sample_adaptive_waypoints(
+                geo_data,
+                num_points=self.num_waypoints,
+                curvature_weight=self.curvature_weight,
+            )
+            waypoints = densify_waypoints(waypoints, max_gap_km=self.max_gap_km)
 
-        # Step 4: Route via routing engine
-        route = self.router.route_waypoints(waypoints)
+        # Step 4: Route via routing engine (parallel if available)
+        if hasattr(self.router, 'route_waypoints_parallel'):
+            route = self.router.route_waypoints_parallel(waypoints)
+        else:
+            route = self.router.route_waypoints(waypoints)
 
         if len(route) < 2:
             logger.warning(f"Routing failed for '{concept}'")
@@ -163,24 +193,27 @@ class DDPORewardWrapper:
         logger.info(
             f"  [{concept}] reward={result['reward']:.3f} "
             f"(clip={result['clip_score']:.3f}, chamfer={result['chamfer_score']:.3f}) "
-            f"route_pts={len(route)} time={elapsed:.1f}s"
+            f"route_pts={len(route)} inner_contours={n_inner} time={elapsed:.1f}s"
         )
 
         # Attach intermediate artifacts for W&B logging
-        result["_image"] = image  # generated silhouette
-        result["_edges"] = Image.fromarray(edges)  # Canny edge map
-        result["_route"] = route  # routed path
+        result["_image"] = image
+        result["_edges"] = Image.fromarray(edges)
+        result["_route"] = route
         result["_concept"] = concept
-        result["_num_contour_points"] = len(contour)
+        result["_num_inner_contours"] = n_inner
         result["_num_waypoints"] = len(waypoints)
         result["_num_route_points"] = len(route)
         result["_placement"] = best_placement
 
-        # Create contour overlay using raw pixel contour (not normalized)
-        if pixel_contour is not None:
-            import cv2 as _cv2
+        # Create contour overlay with outer (red) + inner (blue)
+        import cv2 as _cv2
+        pixel_cs = extract_contour_set(image)
+        if pixel_cs is not None:
             vis = np.array(image.copy().convert("RGB"))
-            _cv2.drawContours(vis, [pixel_contour], -1, (255, 0, 0), 2)
+            _cv2.drawContours(vis, [pixel_cs.outer], -1, (255, 0, 0), 2)
+            for inner_c in pixel_cs.inner:
+                _cv2.drawContours(vis, [inner_c], -1, (0, 100, 255), 2)
             result["_contour_overlay"] = Image.fromarray(vis)
 
         return result

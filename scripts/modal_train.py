@@ -40,6 +40,7 @@ image = (
         # Routing & data
         "gpxpy>=1.6",
         "requests>=2.31",
+        "aiohttp>=3.9",
         "pyyaml>=6.0",
         # Logging
         "wandb>=0.16",
@@ -60,7 +61,10 @@ vol = modal.Volume.from_name("route-sculptor-data", create_if_missing=True)
     gpu="A100",
     timeout=6 * 3600,  # 6 hours max
     volumes={"/data": vol},
-    secrets=[modal.Secret.from_name("wandb-secret")],
+    secrets=[
+        modal.Secret.from_name("wandb-secret"),
+        modal.Secret.from_name("huggingface-secret"),
+    ],
 )
 def train(
     config_path: str = "configs/default.yaml",

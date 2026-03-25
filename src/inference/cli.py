@@ -23,6 +23,10 @@ logger = logging.getLogger(__name__)
 @click.option("--seed", default=None, type=int, help="Random seed")
 @click.option("--config", default="configs/default.yaml", help="Config file path")
 @click.option("--preview", is_flag=True, help="Save preview images alongside GPX")
+@click.option("--multi-contour/--no-multi-contour", default=None,
+              help="Include internal details (eyes, etc). Default: from config.")
+@click.option("--use-svg/--use-sd", default=True,
+              help="Use pre-made SVG silhouettes (default) or SD 1.5 generation.")
 @click.option("-v", "--verbose", is_flag=True, help="Verbose logging")
 def main(
     concept: str,
@@ -32,6 +36,8 @@ def main(
     seed: int | None,
     config: str,
     preview: bool,
+    multi_contour: bool | None,
+    use_svg: bool,
     verbose: bool,
 ):
     """Generate a GPX bike route shaped like a concept."""
@@ -42,15 +48,21 @@ def main(
 
     import yaml
     from src.pipeline.image_gen import ImageGenerator
-    from src.pipeline.edge_detect import process_image
+    from src.pipeline.edge_detect import ContourSet, process_image
     from src.pipeline.placement import grid_search
-    from src.pipeline.waypoints import sample_adaptive_waypoints, densify_waypoints
+    from src.pipeline.waypoints import (
+        sample_adaptive_waypoints, densify_waypoints, sample_multi_contour_waypoints,
+    )
     from src.pipeline.gpx_utils import route_to_gpx, save_gpx
     from src.evaluation.render import render_polyline, render_map_overlay
 
     # Load config
     with open(config) as f:
         cfg = yaml.safe_load(f)
+
+    # Resolve multi-contour: CLI flag overrides config
+    mc_cfg = cfg.get("multi_contour", {})
+    use_multi = multi_contour if multi_contour is not None else mc_cfg.get("enabled", True)
 
     # Parse bounding box
     if bbox:
@@ -63,36 +75,54 @@ def main(
         sf = cfg["sf_bbox"]
         sf_bbox = BBox(**sf)
 
-    # Step 1: Generate image
-    logger.info(f"Generating image for concept: '{concept}'")
-    gen_cfg = cfg["image_gen"]
-    generator = ImageGenerator(
-        model_id=checkpoint or gen_cfg["model_id"],
-        prompt_template=gen_cfg["prompt_template"],
-        image_size=gen_cfg["image_size"],
-        num_inference_steps=gen_cfg["num_inference_steps"],
-        guidance_scale=gen_cfg["guidance_scale"],
-    )
-    image = generator.generate(concept, seed=seed)
+    # Step 1: Get silhouette image
+    from src.pipeline.image_gen import load_silhouette
+    image = None
+    if use_svg:
+        image = load_silhouette(concept)
+        if image:
+            logger.info(f"Loaded pre-made silhouette for '{concept}'")
+        else:
+            logger.info(f"No pre-made silhouette for '{concept}', falling back to SD 1.5")
+
+    if image is None:
+        logger.info(f"Generating image for concept: '{concept}' with SD 1.5")
+        gen_cfg = cfg["image_gen"]
+        generator = ImageGenerator(
+            model_id=checkpoint or gen_cfg["model_id"],
+            prompt_template=gen_cfg["prompt_template"],
+            negative_prompt=gen_cfg.get("negative_prompt", ""),
+            image_size=gen_cfg["image_size"],
+            num_inference_steps=gen_cfg["num_inference_steps"],
+            guidance_scale=gen_cfg["guidance_scale"],
+        )
+        image = generator.generate(concept, seed=seed)
 
     if preview:
         image.save(output.replace(".gpx", "_generated.png"))
 
-    # Step 2: Edge detection
+    # Step 2: Edge detection + contour extraction
     logger.info("Extracting edges and contour...")
     edge_cfg = cfg["edge_detect"]
-    edges, contour = process_image(
-        image, edge_cfg["canny_low"], edge_cfg["canny_high"], edge_cfg["blur_kernel"]
+    edges, contour_data = process_image(
+        image, edge_cfg["canny_low"], edge_cfg["canny_high"], edge_cfg["blur_kernel"],
+        multi_contour=use_multi,
+        min_inner_area_ratio=mc_cfg.get("min_inner_area_ratio", 0.005),
+        max_inner_contours=mc_cfg.get("max_inner_contours", 5),
     )
-    if contour is None:
+    if contour_data is None:
         click.echo("Error: No contour found in generated image.", err=True)
         raise SystemExit(1)
+
+    is_multi = isinstance(contour_data, ContourSet)
+    if is_multi:
+        logger.info(f"Found {len(contour_data.inner)} inner contours")
 
     # Step 3: Grid search placement
     logger.info("Searching for best placement...")
     p_cfg = cfg["placement"]
     placements = grid_search(
-        contour, sf_bbox,
+        contour_data, sf_bbox,
         num_positions=p_cfg["num_positions"],
         num_scales=p_cfg["num_scales"],
         num_rotations=p_cfg["num_rotations"],
@@ -102,7 +132,7 @@ def main(
         click.echo("Error: No valid placements found.", err=True)
         raise SystemExit(1)
 
-    best, geo_contour = placements[0]
+    best, geo_data = placements[0]
     logger.info(
         f"Best placement: center=({best.center_lat:.4f}, {best.center_lon:.4f}), "
         f"scale={best.scale_km:.1f}km, rotation={best.rotation_deg:.0f}°"
@@ -110,21 +140,34 @@ def main(
 
     # Step 4: Sample waypoints
     wp_cfg = cfg["waypoints"]
-    waypoints = sample_adaptive_waypoints(
-        geo_contour,
-        num_points=wp_cfg["num_points"],
-        curvature_weight=wp_cfg.get("curvature_weight", 2.0),
-    )
-    waypoints = densify_waypoints(
-        waypoints, max_gap_km=wp_cfg.get("max_gap_km", 0.15),
-    )
+    if is_multi and isinstance(geo_data, ContourSet):
+        waypoints = sample_multi_contour_waypoints(
+            geo_data,
+            num_points=wp_cfg["num_points"],
+            curvature_weight=wp_cfg.get("curvature_weight", 2.0),
+            outer_budget_min=mc_cfg.get("outer_budget_min", 0.6),
+            min_inner_waypoints=mc_cfg.get("min_inner_waypoints", 4),
+            max_gap_km=wp_cfg.get("max_gap_km", 0.15),
+        )
+    else:
+        waypoints = sample_adaptive_waypoints(
+            geo_data,
+            num_points=wp_cfg["num_points"],
+            curvature_weight=wp_cfg.get("curvature_weight", 2.0),
+        )
+        waypoints = densify_waypoints(
+            waypoints, max_gap_km=wp_cfg.get("max_gap_km", 0.15),
+        )
 
     # Step 5: Route via routing engine
     logger.info("Computing bike route...")
     from src.pipeline.routing import create_router
 
     router = create_router(cfg["routing"])
-    route = router.route_waypoints(waypoints)
+    if cfg["routing"].get("parallel", True) and hasattr(router, 'route_waypoints_parallel'):
+        route = router.route_waypoints_parallel(waypoints)
+    else:
+        route = router.route_waypoints(waypoints)
 
     if len(route) < 2:
         click.echo("Error: Routing returned insufficient points.", err=True)

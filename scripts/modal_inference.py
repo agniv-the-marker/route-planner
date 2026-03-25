@@ -36,6 +36,9 @@ image = (
         "gpxpy>=1.6",
         "Pillow>=10.0",
         "requests>=2.31",
+        "aiohttp>=3.9",
+        "osmnx>=2.0",
+        "scikit-learn>=1.3",
         "pyyaml>=6.0",
     )
     .add_local_dir(".", remote_path="/app", ignore=IGNORE_PATTERNS, copy=True)
@@ -52,6 +55,7 @@ vol = modal.Volume.from_name("route-sculptor-data", create_if_missing=True)
     gpu="A10G",
     timeout=600,
     volumes={"/data": vol},
+    secrets=[modal.Secret.from_name("huggingface-secret")],
 )
 def generate_route(
     concept: str,
@@ -88,16 +92,21 @@ def generate_route(
     model_id = checkpoint or cfg["image_gen"]["model_id"]
 
     from src.pipeline.image_gen import ImageGenerator
-    from src.pipeline.edge_detect import process_image
+    from src.pipeline.edge_detect import ContourSet, process_image
     from src.pipeline.placement import BBox, grid_search
-    from src.pipeline.waypoints import sample_adaptive_waypoints, densify_waypoints
+    from src.pipeline.waypoints import (
+        sample_adaptive_waypoints, densify_waypoints, sample_multi_contour_waypoints,
+    )
     from src.pipeline.routing import create_router
     from src.pipeline.gpx_utils import route_to_gpx
+
+    mc_cfg = cfg.get("multi_contour", {})
 
     logger.info(f"Generating image for '{concept}' with model {model_id}")
     generator = ImageGenerator(
         model_id=model_id,
         prompt_template=cfg["image_gen"]["prompt_template"],
+        negative_prompt=cfg["image_gen"].get("negative_prompt", ""),
         image_size=cfg["image_gen"]["image_size"],
         num_inference_steps=cfg["image_gen"]["num_inference_steps"],
         guidance_scale=cfg["image_gen"]["guidance_scale"],
@@ -106,43 +115,62 @@ def generate_route(
 
     logger.info("Extracting edges...")
     edge_cfg = cfg["edge_detect"]
-    edges, contour = process_image(
-        image, edge_cfg["canny_low"], edge_cfg["canny_high"], edge_cfg["blur_kernel"]
+    edges, contour_data = process_image(
+        image, edge_cfg["canny_low"], edge_cfg["canny_high"], edge_cfg["blur_kernel"],
+        multi_contour=mc_cfg.get("enabled", True),
+        min_inner_area_ratio=mc_cfg.get("min_inner_area_ratio", 0.005),
+        max_inner_contours=mc_cfg.get("max_inner_contours", 5),
     )
-    if contour is None:
+    if contour_data is None:
         raise RuntimeError(f"No contour found in generated image for '{concept}'")
+
+    is_multi = isinstance(contour_data, ContourSet)
 
     logger.info("Grid search placement...")
     sf = cfg["sf_bbox"]
     bbox = BBox(**sf)
     p_cfg = cfg["placement"]
     placements = grid_search(
-        contour, bbox,
+        contour_data, bbox,
         num_positions=p_cfg["num_positions"],
         num_scales=p_cfg["num_scales"],
         num_rotations=p_cfg["num_rotations"],
         scale_range_km=tuple(p_cfg["scale_range_km"]),
+        max_rotation_deg=p_cfg.get("max_rotation_deg", 15.0),
     )
     if not placements:
         raise RuntimeError(f"No valid placements found for '{concept}'")
 
-    best, geo_contour = placements[0]
+    best, geo_data = placements[0]
     logger.info(
         f"Best placement: center=({best.center_lat:.4f}, {best.center_lon:.4f}), "
         f"scale={best.scale_km:.1f}km, rotation={best.rotation_deg:.0f}°"
     )
 
     wp_cfg = cfg["waypoints"]
-    waypoints = sample_adaptive_waypoints(
-        geo_contour,
-        num_points=wp_cfg["num_points"],
-        curvature_weight=wp_cfg.get("curvature_weight", 2.0),
-    )
-    waypoints = densify_waypoints(waypoints, max_gap_km=wp_cfg.get("max_gap_km", 0.15))
+    if is_multi and isinstance(geo_data, ContourSet):
+        waypoints = sample_multi_contour_waypoints(
+            geo_data,
+            num_points=wp_cfg["num_points"],
+            curvature_weight=wp_cfg.get("curvature_weight", 2.0),
+            outer_budget_min=mc_cfg.get("outer_budget_min", 0.6),
+            min_inner_waypoints=mc_cfg.get("min_inner_waypoints", 4),
+            max_gap_km=wp_cfg.get("max_gap_km", 0.15),
+        )
+    else:
+        waypoints = sample_adaptive_waypoints(
+            geo_data,
+            num_points=wp_cfg["num_points"],
+            curvature_weight=wp_cfg.get("curvature_weight", 2.0),
+        )
+        waypoints = densify_waypoints(waypoints, max_gap_km=wp_cfg.get("max_gap_km", 0.15))
 
     logger.info("Computing bike route...")
     router = create_router(cfg["routing"])
-    route = router.route_waypoints(waypoints)
+    if hasattr(router, 'route_waypoints_parallel'):
+        route = router.route_waypoints_parallel(waypoints)
+    else:
+        route = router.route_waypoints(waypoints)
 
     if len(route) < 2:
         raise RuntimeError(f"Routing failed for '{concept}'")
