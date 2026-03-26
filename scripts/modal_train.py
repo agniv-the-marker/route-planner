@@ -34,6 +34,8 @@ image = (
         "peft>=0.6",
         # Vision / science
         "opencv-python-headless>=4.8",
+        "osmnx>=2.0",
+        "scikit-learn>=1.3",
         "numpy>=1.24",
         "scipy>=1.11",
         "Pillow>=10.0",
@@ -97,12 +99,31 @@ def train(
     os.environ["TRAIN_SAMPLES_DIR"] = "/data/training_samples"
     os.environ["CHECKPOINT_DIR"] = "/data/checkpoints"
 
+    # Ensure SF bike graph is available (download to volume if missing)
+    graph_path = "/data/sf_bike_graph.graphml"
+    if not os.path.exists(graph_path):
+        print("Downloading SF bike graph to volume (one-time)...")
+        import osmnx as ox
+        G = ox.graph.graph_from_place(
+            "San Francisco, California, USA",
+            network_type="bike",
+            custom_filter='["route"!~"ferry"]',
+            retain_all=False, simplify=True,
+        )
+        ox.save_graphml(G, graph_path)
+        print(f"Graph saved: {len(G.nodes)} nodes, {len(G.edges)} edges")
+        vol.commit()
+
     # Load and optionally override config
     with open(f"/app/{config_path}") as f:
         config = yaml.safe_load(f)
 
-    # Bump inference steps back to 30 for GPU training (default.yaml has 10 for CPU)
+    # Bump inference steps back to 30 for GPU training
     config["image_gen"]["num_inference_steps"] = 30
+
+    # Use graph routing with volume-cached graph
+    config["routing"]["backend"] = "graph"
+    config["routing"]["graph_path"] = graph_path
 
     if num_epochs is not None:
         config["training"]["num_epochs"] = num_epochs

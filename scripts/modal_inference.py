@@ -40,6 +40,7 @@ image = (
         "osmnx>=2.0",
         "scikit-learn>=1.3",
         "pyyaml>=6.0",
+        "wandb>=0.16",
     )
     .add_local_dir(".", remote_path="/app", ignore=IGNORE_PATTERNS, copy=True)
 )
@@ -101,17 +102,68 @@ def generate_route(
     from src.pipeline.gpx_utils import route_to_gpx
 
     mc_cfg = cfg.get("multi_contour", {})
+    gen_cfg = cfg["image_gen"]
+    use_controlnet = gen_cfg.get("use_controlnet", False)
 
-    logger.info(f"Generating image for '{concept}' with model {model_id}")
-    generator = ImageGenerator(
-        model_id=model_id,
-        prompt_template=cfg["image_gen"]["prompt_template"],
-        negative_prompt=cfg["image_gen"].get("negative_prompt", ""),
-        image_size=cfg["image_gen"]["image_size"],
-        num_inference_steps=cfg["image_gen"]["num_inference_steps"],
-        guidance_scale=cfg["image_gen"]["guidance_scale"],
-    )
-    image = generator.generate(concept, seed=seed)
+    if use_controlnet:
+        # INVERTED PIPELINE: placement first → render map → ControlNet generation
+        logger.info(f"ControlNet mode: generating '{concept}' conditioned on road map")
+
+        from src.pipeline.image_gen import ControlNetImageGenerator
+        from src.pipeline.map_render import render_local_map
+
+        # Step 1: Pick a placement (use a dummy circle contour for grid search)
+        import numpy as np
+        t = np.linspace(0, 2 * np.pi, 100)
+        dummy_contour = np.column_stack([0.5 + 0.4 * np.cos(t), 0.5 + 0.4 * np.sin(t)])
+
+        sf = cfg["sf_bbox"]
+        bbox = BBox(**sf)
+        p_cfg = cfg["placement"]
+        placements = grid_search(
+            dummy_contour, bbox,
+            num_positions=p_cfg["num_positions"], num_scales=p_cfg["num_scales"],
+            num_rotations=1,  # no rotation for ControlNet (map is fixed)
+            scale_range_km=tuple(p_cfg["scale_range_km"]),
+            max_rotation_deg=0.0,
+        )
+        best_placement = placements[0][0] if placements else None
+
+        if best_placement is None:
+            raise RuntimeError("No valid placement found")
+
+        # Step 2: Render local road map for this placement
+        router = create_router(cfg["routing"])
+        road_map = render_local_map(
+            router.G, best_placement.center_lat, best_placement.center_lon,
+            best_placement.scale_km, size=gen_cfg["image_size"],
+        )
+
+        # Step 3: Generate silhouette conditioned on road map
+        cn_gen = ControlNetImageGenerator(
+            model_id=checkpoint or gen_cfg["model_id"],
+            controlnet_id=gen_cfg.get("controlnet_model", "lllyasviel/control_v11p_sd15_canny"),
+            prompt_template=gen_cfg["prompt_template"],
+            negative_prompt=gen_cfg.get("negative_prompt", ""),
+            image_size=gen_cfg["image_size"],
+            num_inference_steps=gen_cfg["num_inference_steps"],
+            guidance_scale=gen_cfg["guidance_scale"],
+            controlnet_scale=gen_cfg.get("controlnet_scale", 0.5),
+        )
+        image = cn_gen.generate(concept, conditioning_image=road_map, seed=seed)
+
+    else:
+        # STANDARD PIPELINE: generate first, then place
+        logger.info(f"Generating image for '{concept}' with model {model_id}")
+        generator = ImageGenerator(
+            model_id=model_id,
+            prompt_template=gen_cfg["prompt_template"],
+            negative_prompt=gen_cfg.get("negative_prompt", ""),
+            image_size=gen_cfg["image_size"],
+            num_inference_steps=gen_cfg["num_inference_steps"],
+            guidance_scale=gen_cfg["guidance_scale"],
+        )
+        image = generator.generate(concept, seed=seed)
 
     logger.info("Extracting edges...")
     edge_cfg = cfg["edge_detect"]
@@ -126,51 +178,73 @@ def generate_route(
 
     is_multi = isinstance(contour_data, ContourSet)
 
-    logger.info("Grid search placement...")
-    sf = cfg["sf_bbox"]
-    bbox = BBox(**sf)
-    p_cfg = cfg["placement"]
-    placements = grid_search(
-        contour_data, bbox,
-        num_positions=p_cfg["num_positions"],
-        num_scales=p_cfg["num_scales"],
-        num_rotations=p_cfg["num_rotations"],
-        scale_range_km=tuple(p_cfg["scale_range_km"]),
-        max_rotation_deg=p_cfg.get("max_rotation_deg", 15.0),
-    )
-    if not placements:
-        raise RuntimeError(f"No valid placements found for '{concept}'")
+    if use_controlnet and best_placement is not None:
+        # ControlNet: placement already chosen, use it to transform contour
+        from src.pipeline.placement import transform_contour, transform_contour_set
+        if is_multi:
+            geo_data = transform_contour_set(
+                contour_data, best_placement.center_lat, best_placement.center_lon,
+                best_placement.scale_km, best_placement.rotation_deg,
+            )
+        else:
+            geo_data = transform_contour(
+                contour_data, best_placement.center_lat, best_placement.center_lon,
+                best_placement.scale_km, best_placement.rotation_deg,
+            )
+        best = best_placement
+    else:
+        # Standard: grid search for placement
+        logger.info("Grid search placement...")
+        sf = cfg["sf_bbox"]
+        bbox = BBox(**sf)
+        p_cfg = cfg["placement"]
+        placements = grid_search(
+            contour_data, bbox,
+            num_positions=p_cfg["num_positions"],
+            num_scales=p_cfg["num_scales"],
+            num_rotations=p_cfg["num_rotations"],
+            scale_range_km=tuple(p_cfg["scale_range_km"]),
+            max_rotation_deg=p_cfg.get("max_rotation_deg", 15.0),
+        )
+        if not placements:
+            raise RuntimeError(f"No valid placements found for '{concept}'")
+        best, geo_data = placements[0]
 
-    best, geo_data = placements[0]
     logger.info(
-        f"Best placement: center=({best.center_lat:.4f}, {best.center_lon:.4f}), "
+        f"Placement: center=({best.center_lat:.4f}, {best.center_lon:.4f}), "
         f"scale={best.scale_km:.1f}km, rotation={best.rotation_deg:.0f}°"
     )
 
-    wp_cfg = cfg["waypoints"]
-    if is_multi and isinstance(geo_data, ContourSet):
-        waypoints = sample_multi_contour_waypoints(
-            geo_data,
-            num_points=wp_cfg["num_points"],
-            curvature_weight=wp_cfg.get("curvature_weight", 2.0),
-            outer_budget_min=mc_cfg.get("outer_budget_min", 0.6),
-            min_inner_waypoints=mc_cfg.get("min_inner_waypoints", 4),
-            max_gap_km=wp_cfg.get("max_gap_km", 0.15),
-        )
-    else:
-        waypoints = sample_adaptive_waypoints(
-            geo_data,
-            num_points=wp_cfg["num_points"],
-            curvature_weight=wp_cfg.get("curvature_weight", 2.0),
-        )
-        waypoints = densify_waypoints(waypoints, max_gap_km=wp_cfg.get("max_gap_km", 0.15))
-
     logger.info("Computing bike route...")
     router = create_router(cfg["routing"])
-    if hasattr(router, 'route_waypoints_parallel'):
-        route = router.route_waypoints_parallel(waypoints)
+
+    # Snap contour to road graph if available
+    if hasattr(router, 'G'):
+        from src.pipeline.road_align import RoadAligner
+        logger.info("Snapping contour to road graph...")
+        aligner = RoadAligner(router.G)
+        outer = geo_data.outer if (is_multi and isinstance(geo_data, ContourSet)) else geo_data
+        waypoints = aligner.snap_contour(outer, subsample=3)
     else:
-        route = router.route_waypoints(waypoints)
+        wp_cfg = cfg["waypoints"]
+        if is_multi and isinstance(geo_data, ContourSet):
+            waypoints = sample_multi_contour_waypoints(
+                geo_data,
+                num_points=wp_cfg["num_points"],
+                curvature_weight=wp_cfg.get("curvature_weight", 2.0),
+                outer_budget_min=mc_cfg.get("outer_budget_min", 0.6),
+                min_inner_waypoints=mc_cfg.get("min_inner_waypoints", 4),
+                max_gap_km=wp_cfg.get("max_gap_km", 0.15),
+            )
+        else:
+            waypoints = sample_adaptive_waypoints(
+                geo_data,
+                num_points=wp_cfg["num_points"],
+                curvature_weight=wp_cfg.get("curvature_weight", 2.0),
+            )
+            waypoints = densify_waypoints(waypoints, max_gap_km=wp_cfg.get("max_gap_km", 0.15))
+
+    route = router.route_waypoints(waypoints)
 
     if len(route) < 2:
         raise RuntimeError(f"Routing failed for '{concept}'")
@@ -188,22 +262,67 @@ def generate_route(
 
     if preview:
         import io
-        from src.evaluation.render import render_polyline, render_map_overlay
+        import cv2 as _cv2
+        import numpy as _np
+        from src.evaluation.render import render_polyline
+        from src.pipeline.edge_detect import extract_contour_set
+        from PIL import Image as _PILImage
 
+        # Raw silhouette (before post-processing)
+        raw_image = None
+        if use_controlnet and hasattr(cn_gen, '_last_raw'):
+            raw_image = cn_gen._last_raw
+        elif not use_controlnet and hasattr(generator, '_last_raw'):
+            raw_image = generator._last_raw
+        if raw_image is not None:
+            raw_buf = io.BytesIO()
+            raw_image.save(raw_buf, format="PNG")
+            result["raw_silhouette_png"] = raw_buf.getvalue()
+
+        # Road map (ControlNet conditioning)
+        if use_controlnet and road_map is not None:
+            map_buf = io.BytesIO()
+            road_map.convert("RGB").save(map_buf, format="PNG")
+            result["road_map_png"] = map_buf.getvalue()
+
+        # Processed silhouette
+        sil_buf = io.BytesIO()
+        image.save(sil_buf, format="PNG")
+        result["silhouette_png"] = sil_buf.getvalue()
+
+        # Edges
+        edges_buf = io.BytesIO()
+        _PILImage.fromarray(edges).save(edges_buf, format="PNG")
+        result["edges_png"] = edges_buf.getvalue()
+
+        # Contour overlay (outer=red, inner=blue)
+        pixel_cs = extract_contour_set(image)
+        if pixel_cs is not None:
+            vis = _np.array(image.copy().convert("RGB"))
+            _cv2.drawContours(vis, [pixel_cs.outer], -1, (255, 0, 0), 2)
+            for c in pixel_cs.inner:
+                _cv2.drawContours(vis, [c], -1, (0, 100, 255), 2)
+            contour_buf = io.BytesIO()
+            _PILImage.fromarray(vis).save(contour_buf, format="PNG")
+            result["contour_png"] = contour_buf.getvalue()
+
+        # Route polyline
         polyline_img = render_polyline(route)
-        map_img = render_map_overlay(route)
-
         poly_buf = io.BytesIO()
         polyline_img.save(poly_buf, format="PNG")
         result["polyline_png"] = poly_buf.getvalue()
 
-        map_buf = io.BytesIO()
-        map_img.save(map_buf, format="PNG")
-        result["map_png"] = map_buf.getvalue()
-
-        sil_buf = io.BytesIO()
-        image.save(sil_buf, format="PNG")
-        result["silhouette_png"] = sil_buf.getvalue()
+        # Metadata
+        result["metadata"] = {
+            "concept": concept,
+            "placement": {
+                "center_lat": best.center_lat, "center_lon": best.center_lon,
+                "scale_km": best.scale_km, "rotation_deg": best.rotation_deg,
+            },
+            "route_points": len(route),
+            "waypoints": len(waypoints),
+            "inner_contours": len(contour_data.inner) if is_multi else 0,
+        }
 
     vol.commit()
     return result
@@ -217,12 +336,12 @@ def generate_route(
 def main(
     concept: str = "horse",
     output: str = "output.gpx",
-    seed: int = None,
+    seed: int = 42,
     checkpoint: str = None,
     preview: bool = False,
 ):
     """Generate a GPX route using Modal GPU."""
-    print(f"Generating route for '{concept}' on Modal A10G...")
+    print(f"Generating route for '{concept}' (seed={seed}) on Modal A10G...")
 
     result = generate_route.remote(
         concept=concept,
@@ -231,18 +350,33 @@ def main(
         preview=preview,
     )
 
+    # Save to structured directory: outputs/{concept}/
     output_path = Path(output)
-    output_path.write_bytes(result["gpx_bytes"])
-    print(f"GPX saved to {output_path} ({result['num_points']} points)")
+    if output_path.suffix == ".gpx":
+        concept_dir = output_path.parent
+    else:
+        concept_dir = output_path / concept
+    concept_dir.mkdir(parents=True, exist_ok=True)
+
+    gpx_path = concept_dir / "route.gpx"
+    gpx_path.write_bytes(result["gpx_bytes"])
+    print(f"GPX saved to {gpx_path} ({result['num_points']} points)")
 
     if preview:
-        base = output_path.stem
-        out_dir = output_path.parent
+        for key, filename in [
+            ("raw_silhouette_png", "raw_silhouette.png"),
+            ("silhouette_png", "silhouette.png"),
+            ("road_map_png", "road_map.png"),
+            ("edges_png", "edges.png"),
+            ("contour_png", "contour.png"),
+            ("polyline_png", "polyline.png"),
+        ]:
+            if key in result:
+                (concept_dir / filename).write_bytes(result[key])
 
-        if "silhouette_png" in result:
-            (out_dir / f"{base}_silhouette.png").write_bytes(result["silhouette_png"])
-        if "polyline_png" in result:
-            (out_dir / f"{base}_polyline.png").write_bytes(result["polyline_png"])
-        if "map_png" in result:
-            (out_dir / f"{base}_map.png").write_bytes(result["map_png"])
-        print("Preview images saved.")
+        if "metadata" in result:
+            import json
+            with open(concept_dir / "metadata.json", "w") as f:
+                json.dump(result["metadata"], f, indent=2)
+
+        print(f"All outputs saved to {concept_dir}/")

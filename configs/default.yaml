@@ -3,11 +3,14 @@
 # Image generation
 image_gen:
   model_id: "runwayml/stable-diffusion-v1-5"
-  prompt_template: "simple 2d black silhouette of a {concept}, full body, solid filled shape on plain white background, flat graphic, logo style, no detail, no shading"
-  negative_prompt: "3d, depth, perspective, realistic, photograph, detailed, complex, intricate, outline, lines, strokes, sketch, hatching, texture, shading, gradient, gray, person, people, human, hands, text, watermark, color, multiple objects, cropped, partial, head only, close up, blurry, noise"
+  prompt_template: "black silhouette of a single {concept}, solid black shape, pure white background, simple flat icon, minimal, centered, one object only"
+  negative_prompt: "circle around, encircled, ring, border, frame, multiple, two, many, pair, group, pattern, texture, ornate, decorated, background, scenery, environment, water, ocean, sky, ground, grass, nature, landscape, 3d, realistic, photo, detailed, complex, lines, sketch, hatching, shading, gradient, gray, person, human, hands, text, watermark, color, noise, blurry"
   image_size: 512
   num_inference_steps: 30  # 30 steps needed for clean silhouettes (use GPU/Modal)
   guidance_scale: 8.0  # 8 is sweet spot for SD 1.5 silhouettes (10+ causes artifacts)
+  use_controlnet: true
+  controlnet_model: "lllyasviel/control_v11p_sd15_canny"
+  controlnet_scale: 0.1  # gentle bias toward road grid (0.5 was too strong)
 
 # Edge detection
 edge_detect:
@@ -37,12 +40,12 @@ multi_contour:
   outer_budget_min: 0.6  # minimum fraction of waypoint budget for outer
   min_inner_waypoints: 4
 
-# San Francisco bounding box (expanded: Potrero Hill to Presidio)
+# San Francisco bounding box (full city, graph excludes water routes)
 sf_bbox:
-  min_lat: 37.7350
-  max_lat: 37.8050
-  min_lon: -122.4700
-  max_lon: -122.3850
+  min_lat: 37.7100
+  max_lat: 37.7950    # avoid waterfront/bay
+  min_lon: -122.5100
+  max_lon: -122.3800
 
 # Routing (Valhalla is default, OSRM as fallback)
 routing:
@@ -60,8 +63,8 @@ routing:
 evaluation:
   clip_model: "openai/clip-vit-base-patch32"
   clip_prompt_template: "a GPS bike route on a map that traces the outline of a {concept}"
-  reward_clip_weight: 0.7
-  reward_chamfer_weight: 0.3
+  reward_clip_weight: 1.0
+  reward_chamfer_weight: 0.0
   render_size: 512
 
 # DDPO training

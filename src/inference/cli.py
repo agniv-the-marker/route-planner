@@ -98,8 +98,18 @@ def main(
         )
         image = generator.generate(concept, seed=seed)
 
+    # Set up structured output directory: outputs/{concept}/
+    from pathlib import Path as _Path
+    output_path = _Path(output)
+    if output_path.suffix == ".gpx":
+        # Old-style single file path → convert to structured dir
+        concept_dir = output_path.parent / concept
+    else:
+        concept_dir = output_path / concept
+    concept_dir.mkdir(parents=True, exist_ok=True)
+
     if preview:
-        image.save(output.replace(".gpx", "_generated.png"))
+        image.save(concept_dir / "silhouette.png")
 
     # Step 2: Edge detection + contour extraction
     logger.info("Extracting edges and contour...")
@@ -138,55 +148,96 @@ def main(
         f"scale={best.scale_km:.1f}km, rotation={best.rotation_deg:.0f}°"
     )
 
-    # Step 4: Sample waypoints
-    wp_cfg = cfg["waypoints"]
-    if is_multi and isinstance(geo_data, ContourSet):
-        waypoints = sample_multi_contour_waypoints(
-            geo_data,
-            num_points=wp_cfg["num_points"],
-            curvature_weight=wp_cfg.get("curvature_weight", 2.0),
-            outer_budget_min=mc_cfg.get("outer_budget_min", 0.6),
-            min_inner_waypoints=mc_cfg.get("min_inner_waypoints", 4),
-            max_gap_km=wp_cfg.get("max_gap_km", 0.15),
-        )
+    # Step 4: Snap contour to road graph + sample waypoints
+    from src.pipeline.routing import create_router
+    router = create_router(cfg["routing"])
+
+    # If graph router available, snap contour to roads
+    if hasattr(router, 'G'):
+        from src.pipeline.road_align import RoadAligner
+        logger.info("Snapping contour to road graph...")
+        aligner = RoadAligner(router.G)
+        outer = geo_data.outer if (is_multi and isinstance(geo_data, ContourSet)) else geo_data
+        waypoints = aligner.snap_contour(outer, subsample=3)
     else:
-        waypoints = sample_adaptive_waypoints(
-            geo_data,
-            num_points=wp_cfg["num_points"],
-            curvature_weight=wp_cfg.get("curvature_weight", 2.0),
-        )
-        waypoints = densify_waypoints(
-            waypoints, max_gap_km=wp_cfg.get("max_gap_km", 0.15),
-        )
+        wp_cfg = cfg["waypoints"]
+        if is_multi and isinstance(geo_data, ContourSet):
+            waypoints = sample_multi_contour_waypoints(
+                geo_data,
+                num_points=wp_cfg["num_points"],
+                curvature_weight=wp_cfg.get("curvature_weight", 2.0),
+                outer_budget_min=mc_cfg.get("outer_budget_min", 0.6),
+                min_inner_waypoints=mc_cfg.get("min_inner_waypoints", 4),
+                max_gap_km=wp_cfg.get("max_gap_km", 0.15),
+            )
+        else:
+            waypoints = sample_adaptive_waypoints(
+                geo_data,
+                num_points=wp_cfg["num_points"],
+                curvature_weight=wp_cfg.get("curvature_weight", 2.0),
+            )
+            waypoints = densify_waypoints(
+                waypoints, max_gap_km=wp_cfg.get("max_gap_km", 0.15),
+            )
 
     # Step 5: Route via routing engine
     logger.info("Computing bike route...")
-    from src.pipeline.routing import create_router
-
-    router = create_router(cfg["routing"])
-    if cfg["routing"].get("parallel", True) and hasattr(router, 'route_waypoints_parallel'):
-        route = router.route_waypoints_parallel(waypoints)
-    else:
-        route = router.route_waypoints(waypoints)
+    route = router.route_waypoints(waypoints)
 
     if len(route) < 2:
         click.echo("Error: Routing returned insufficient points.", err=True)
         raise SystemExit(1)
 
-    # Step 6: Save GPX
+    # Step 6: Save GPX + previews to structured directory
     gpx = route_to_gpx(route, name=f"Route Sculptor: {concept}")
-    save_gpx(gpx, output)
-    click.echo(f"GPX saved to {output} ({len(route)} points)")
+    gpx_path = concept_dir / "route.gpx"
+    save_gpx(gpx, str(gpx_path))
+    click.echo(f"GPX saved to {gpx_path} ({len(route)} points)")
 
-    # Step 7: Optional previews
     if preview:
+        from PIL import Image as PILImage
+        import cv2 as _cv2
+        from src.pipeline.edge_detect import extract_contour_set
+
+        # Save edges
+        PILImage.fromarray(edges).save(concept_dir / "edges.png")
+
+        # Save contour overlay
+        pixel_cs = extract_contour_set(image)
+        if pixel_cs is not None:
+            import numpy as _np
+            vis = _np.array(image.copy().convert("RGB"))
+            _cv2.drawContours(vis, [pixel_cs.outer], -1, (255, 0, 0), 2)
+            for inner_c in pixel_cs.inner:
+                _cv2.drawContours(vis, [inner_c], -1, (0, 100, 255), 2)
+            PILImage.fromarray(vis).save(concept_dir / "contour.png")
+
+        # Save route renders
         polyline_img = render_polyline(route)
-        polyline_img.save(output.replace(".gpx", "_polyline.png"))
+        polyline_img.save(concept_dir / "polyline.png")
 
         map_img = render_map_overlay(route)
-        map_img.save(output.replace(".gpx", "_map.png"))
+        map_img.save(concept_dir / "map_overlay.png")
 
-        click.echo("Preview images saved.")
+        # Save metadata
+        import json
+        metadata = {
+            "concept": concept,
+            "placement": {
+                "center_lat": best.center_lat,
+                "center_lon": best.center_lon,
+                "scale_km": best.scale_km,
+                "rotation_deg": best.rotation_deg,
+                "score": best.score,
+            },
+            "route_points": len(route),
+            "waypoints": len(waypoints),
+            "inner_contours": len(contour_data.inner) if is_multi else 0,
+        }
+        with open(concept_dir / "metadata.json", "w") as f:
+            json.dump(metadata, f, indent=2)
+
+        click.echo(f"All outputs saved to {concept_dir}/")
 
 
 if __name__ == "__main__":

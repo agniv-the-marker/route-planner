@@ -199,18 +199,21 @@ def extract_contour_set(
 
 
 def normalize_contour_set(contour_set: ContourSet) -> ContourSet:
-    """Normalize all contours using the outer contour's bounding box.
+    """Normalize all contours preserving aspect ratio.
 
-    This preserves spatial relationships between outer and inner contours.
+    Uses the outer contour's max span for both axes.
     """
     outer = contour_set.outer.astype(np.float64)
     mins = outer.min(axis=0)
     maxs = outer.max(axis=0)
     span = maxs - mins
-    span = np.where(span == 0, 1.0, span)
+    max_span = max(span[0], span[1])
+    if max_span == 0:
+        max_span = 1.0
+    center = (mins + maxs) / 2
 
-    norm_outer = (outer - mins) / span
-    norm_inner = [(c.astype(np.float64) - mins) / span for c in contour_set.inner]
+    norm_outer = (outer - center) / max_span + 0.5
+    norm_inner = [(c.astype(np.float64) - center) / max_span + 0.5 for c in contour_set.inner]
 
     return ContourSet(
         outer=norm_outer,
@@ -220,21 +223,28 @@ def normalize_contour_set(contour_set: ContourSet) -> ContourSet:
 
 
 def normalize_contour(contour: np.ndarray) -> np.ndarray:
-    """Normalize contour points to [0, 1] x [0, 1] unit coordinates.
+    """Normalize contour points preserving aspect ratio.
+
+    Uses the max span (width or height) for both axes so the shape
+    isn't squashed. Centers the shorter axis.
 
     Args:
         contour: (N, 2) array of pixel coordinates (x, y).
 
     Returns:
-        (N, 2) array of normalized coordinates.
+        (N, 2) array of normalized coordinates in [0, 1] range.
     """
     contour = contour.astype(np.float64)
     mins = contour.min(axis=0)
     maxs = contour.max(axis=0)
     span = maxs - mins
-    # Avoid division by zero
-    span = np.where(span == 0, 1.0, span)
-    return (contour - mins) / span
+    # Use the larger span for both axes to preserve aspect ratio
+    max_span = max(span[0], span[1])
+    if max_span == 0:
+        max_span = 1.0
+    # Center both axes
+    center = (mins + maxs) / 2
+    return (contour - center) / max_span + 0.5
 
 
 def process_image(

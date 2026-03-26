@@ -155,26 +155,37 @@ class DDPORewardWrapper:
 
         best_placement, geo_data = placements[0]
 
-        # Step 3: Sample waypoints
+        # Step 2.5: Snap contour to road graph (if available)
         is_multi = isinstance(geo_data, ContourSet)
-        if is_multi:
-            n_inner = len(geo_data.inner)
-            waypoints = sample_multi_contour_waypoints(
-                geo_data,
-                num_points=self.num_waypoints,
-                curvature_weight=self.curvature_weight,
-                outer_budget_min=self.outer_budget_min,
-                min_inner_waypoints=self.min_inner_waypoints,
-                max_gap_km=self.max_gap_km,
-            )
+        if hasattr(self.router, 'G'):
+            from src.pipeline.road_align import RoadAligner
+            if not hasattr(self, '_aligner'):
+                self._aligner = RoadAligner(self.router.G)
+            outer = geo_data.outer if is_multi else geo_data
+            snapped = self._aligner.snap_contour(outer, subsample=3)
+            # Use snapped contour directly as waypoints (already on road nodes)
+            waypoints = snapped
+            n_inner = len(geo_data.inner) if is_multi else 0
         else:
-            n_inner = 0
-            waypoints = sample_adaptive_waypoints(
-                geo_data,
-                num_points=self.num_waypoints,
-                curvature_weight=self.curvature_weight,
-            )
-            waypoints = densify_waypoints(waypoints, max_gap_km=self.max_gap_km)
+            # Fallback: original waypoint sampling (no graph available)
+            if is_multi:
+                n_inner = len(geo_data.inner)
+                waypoints = sample_multi_contour_waypoints(
+                    geo_data,
+                    num_points=self.num_waypoints,
+                    curvature_weight=self.curvature_weight,
+                    outer_budget_min=self.outer_budget_min,
+                    min_inner_waypoints=self.min_inner_waypoints,
+                    max_gap_km=self.max_gap_km,
+                )
+            else:
+                n_inner = 0
+                waypoints = sample_adaptive_waypoints(
+                    geo_data,
+                    num_points=self.num_waypoints,
+                    curvature_weight=self.curvature_weight,
+                )
+                waypoints = densify_waypoints(waypoints, max_gap_km=self.max_gap_km)
 
         # Step 4: Route via routing engine (parallel if available)
         if hasattr(self.router, 'route_waypoints_parallel'):

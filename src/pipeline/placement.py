@@ -192,7 +192,7 @@ def grid_search(
                     )
                     centrality = 1.0 / (1.0 + dist_to_center)
 
-                    score = 0.6 * coverage + 0.4 * centrality
+                    score = coverage  # maximize shape coverage of the bbox
 
                     placement = Placement(
                         center_lat=lat,
