@@ -78,3 +78,25 @@ this was reported explicitly, without substituting shapes.
 Focused diffusion/web tests passed (13), followed by the monthly-rollover test and an
 additional test proving storage failure prevents paid dispatch. OpenCV is now declared
 in project dependencies, fixing the initial clean-container startup failure.
+
+## Deployment verification — 2026-09-15 loading animation
+
+Chromium loaded https://routesculptor.bike/ with a cold context at 1200×900 and
+390×780. The boot shell's spinning bike was visible 1.5 s and 1.1 s in, with
+`gradio-app` hidden behind it and exactly one masthead on screen; the hand-over to the
+mounted page landed at 2.6 s and 2.4 s, with the map present, the wordmark in EB
+Garamond, no horizontal scroll and no console errors. `/draw` and `/about` still serve
+their own pages and the address bar follows each. 134 tests pass. No inference was
+dispatched, so the monthly ledger is unchanged.
+
+Hoisting the font `@import` out of the boot document's inline stylesheet took the
+served page's first paint off the Google Fonts round trip; the remaining ~1.9 s to
+first paint is transfer, not blocking. Measured on the live page: TTFB 1.27 s, HTML
+body complete at 2.10 s. That page is 934 KB uncompressed (Cloudflare serves it
+`br`-encoded): ~780 KB of it is the SF street path inside Gradio's config, 134 KB the
+inline terrain PNG and 14 KB the stylesheet. Cutting that payload is untried.
+
+Redeploying invalidates the image, so the first request afterwards cold-starts a fresh
+container. That took about 2.5 minutes here and Cloudflare returned 524 to anything
+arriving meanwhile. Warm the Modal URL directly after a deploy before checking the
+domain; an ordinary scale-to-zero cold start was about 11 s.
