@@ -25,7 +25,21 @@ THEME = gr.themes.Base(primary_hue="slate", neutral_hue="stone", radius_size="no
 # until the front end has booted — which is exactly the window its full-page
 # "Loading…" overlay covers. These two go into the served document instead, so the
 # first paint is the site shell and the boot finishes behind it. See boot_document().
-BOOT_HEAD = f'<style>{CSS}\n[data-testid="status-tracker"]{{display:none !important;}}</style>'
+FONT_IMPORT = re.compile(r"@import url\((['\"])(.+?)\1\);\s*")
+FONT_SHEET = FONT_IMPORT.search(CSS).group(2)
+# An @import blocks the first paint until it resolves, so on a cold visit the whole
+# page — the loading bike with it — stayed blank for about two seconds. Fetched through
+# a `print` sheet that promotes itself on load, the fonts cost the first paint nothing;
+# the URL already asks for `display=swap`, so text shows in the fallback face until they
+# arrive. The static pages and Gradio's own copy keep the plain import.
+BOOT_HEAD = (
+    '<link rel="preconnect" href="https://fonts.googleapis.com">'
+    '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
+    f'<link rel="stylesheet" href="{FONT_SHEET}" media="print" onload="this.media=\'all\'">'
+    f'<noscript><link rel="stylesheet" href="{FONT_SHEET}"></noscript>'
+    f'<style>{FONT_IMPORT.sub("", CSS, count=1)}'
+    '\n[data-testid="status-tracker"]{display:none !important;}</style>'
+)
 # A static copy of the masthead, laid out by the same rules as the real one, plus a
 # spinning bike, so the page has its own furniture and its own loading state before
 # Gradio mounts. The mounted app stays hidden behind it until the map exists, so there

@@ -159,6 +159,18 @@ def test_the_served_page_carries_the_stylesheet_and_masthead_before_gradio_boots
     assert header('text') in body
 
 
+def test_the_boot_document_does_not_let_the_fonts_block_the_first_paint():
+    """An @import holds the first paint until it resolves, which kept a cold visit —
+    the loading bike included — blank for about two seconds."""
+    document = boot_document('<html><head></head><body><gradio-app></gradio-app></body></html>')
+    head = document.split('</head>')[0]
+    assert '@import' not in head
+    assert 'fonts.googleapis.com/css2' in CSS  # the source the boot head hoists
+    assert 'media="print" onload="this.media=\'all\'"' in head
+    assert '<noscript><link rel="stylesheet"' in head  # still styled without scripts
+    assert 'rel="preconnect" href="https://fonts.gstatic.com"' in head
+
+
 def test_the_served_page_spins_a_bike_until_the_map_is_there():
     """The slow part of a cold load is the map, so the loading state has to outlive the
     mount and the app has to stay hidden behind it until then."""
