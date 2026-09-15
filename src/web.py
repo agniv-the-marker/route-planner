@@ -26,23 +26,40 @@ THEME = gr.themes.Base(primary_hue="slate", neutral_hue="stone", radius_size="no
 # "Loading…" overlay covers. These two go into the served document instead, so the
 # first paint is the site shell and the boot finishes behind it. See boot_document().
 BOOT_HEAD = f'<style>{CSS}\n[data-testid="status-tracker"]{{display:none !important;}}</style>'
-# A static copy of the masthead, laid out by the same rules as the real one, so the
-# page has its own furniture before Gradio mounts. It removes itself the moment the
-# real masthead exists — inside a MutationObserver callback, so the two never paint
-# together.
+# A static copy of the masthead, laid out by the same rules as the real one, plus a
+# spinning bike, so the page has its own furniture and its own loading state before
+# Gradio mounts. The mounted app stays hidden behind it until the map exists, so there
+# is only ever one masthead on screen; the shell then cross-fades out of the way.
 BOOT_BODY = (
-    f'<div class="gradio-container" id="boot-shell">{header("text")}</div>'
+    f'<div class="gradio-container" id="boot-shell">{header("text")}'
+    '<div class="boot-loading" role="status">'
+    '<span class="boot-bike" aria-hidden="true">\N{BICYCLE}</span>'
+    '<span>drawing the streets of san francisco\N{HORIZONTAL ELLIPSIS}</span>'
+    '</div></div>'
     '<script>(() => {'
     ' const shell = document.getElementById("boot-shell");'
+    ' const root = document.documentElement;'
+    ' root.classList.add("is-booting");'
+    # The map is the last thing the page owes the visitor, and it is the slow part, so
+    # the loader stays up until it is actually in the document.
+    ' const ready = () => document.querySelector("#route-map .street-map");'
+    ' const handOver = () => {'
+    '  root.classList.remove("is-booting");'
+    '  if (!shell.isConnected) return;'
+    # Taken out of the flow first so the real page is already in place underneath while
+    # the shell fades; otherwise the handover is a jump rather than a dissolve.
+    '  shell.classList.add("is-done");'
+    '  setTimeout(() => shell.remove(), 400);'
+    ' };'
     ' const observer = new MutationObserver(() => {'
-    # The block mounts a beat before its HTML lands, so wait for the real header
-    # element rather than its container — otherwise the page loses its masthead for
-    # a few frames in between.
-    '  if (!document.querySelector("#masthead-block #masthead")) return;'
+    '  if (!ready()) return;'
     '  observer.disconnect();'
-    '  shell.remove();'
+    '  handOver();'
     ' });'
     ' observer.observe(document.body, {childList: true, subtree: true});'
+    # A boot that fails or renders no map must not leave the app hidden behind a
+    # bicycle that spins for ever.
+    ' setTimeout(() => { observer.disconnect(); handOver(); }, 20000);'
     '})();</script>'
 )
 

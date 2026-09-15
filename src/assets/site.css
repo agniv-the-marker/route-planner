@@ -39,6 +39,18 @@ body::before { content:""; position:fixed; top:0; bottom:0; left:max(0px,calc((1
    `.main` wrapper is capped at 1024px and centred, so the boot shell's header copies that
    box; otherwise the header jumps sideways when the mounted app replaces it. */
 #boot-shell > .site-header { max-width: 1024px; margin-left: auto; margin-right: auto; }
+#boot-shell { display: flex; flex-direction: column; }
+/* The app mounts behind the boot shell and waits there, so the visitor never sees two
+   mastheads or a half-built page; `is-booting` is dropped the moment the map exists. */
+html.is-booting gradio-app { visibility: hidden; }
+/* Fixed for the fade only: the real page is already in place underneath by then, so the
+   shell dissolves over it instead of collapsing the layout out from under it. */
+#boot-shell.is-done { position: fixed; inset: 0; pointer-events: none; opacity: 0;
+  transition: opacity .4s ease-out; }
+.boot-loading { flex: 1 1 auto; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 16px; padding-bottom: 8vh; min-height: 55vh;
+  font: 400 var(--mono-md)/1.5 var(--mono); color: #687367; }
+.boot-bike { font: 34px/1 sans-serif; animation: bike-spin 1.6s linear infinite; }
 /* Gradio pads every HTML block; strip it so the masthead/footer align with the static pages. */
 #masthead-block .html-container, #credits-block .html-container, #route-map .html-container { padding:0 !important; }
 .site-shell, .site-shell *, .site-shell *::before, .site-shell *::after { box-sizing:border-box; }
@@ -71,7 +83,7 @@ button.is-busy::after { content:"🚲"; display:inline-block; position:relative;
   font:12px/18px sans-serif; animation:bike-spin 1.6s linear infinite; vertical-align:middle; }
 @keyframes bike-spin { to { transform:rotate(360deg); } }
 @keyframes page-in { from { opacity:0; } to { opacity:1; } }
-@media (prefers-reduced-motion:reduce) { .gradio-container,.site-shell,.draw-page { animation:none !important; } button.is-busy::after { animation:none; } }
+@media (prefers-reduced-motion:reduce) { .gradio-container,.site-shell,.draw-page { animation:none !important; } button.is-busy::after { animation:none; } .boot-bike { animation:none; } }
 [data-testid="status-tracker"], .generating .progress-bar, .generating .progress-text, .generating .eta { display:none !important; }
 #status:has(.prose:empty) { display: none; }
 #status p, #credits p, .block label { font: var(--mono-md)/1.5 var(--mono) !important; color: #677062; }

@@ -10,7 +10,7 @@ from PIL import Image
 from src.generation import GenerationResult
 from src.map_view import ASSETS
 from src.site_shell import header
-from src.web import boot_document, create_app, link_preview
+from src.web import CSS, boot_document, create_app, link_preview
 
 
 class StubService:
@@ -155,8 +155,25 @@ def test_the_served_page_carries_the_stylesheet_and_masthead_before_gradio_boots
     assert '[data-testid="status-tracker"]{display:none !important;}' in head
     assert 'gradio-container' in head and '#masthead' in head  # the whole stylesheet
     assert body.index('id="boot-shell"') < body.index('<gradio-app')
-    assert '#masthead-block #masthead' in body  # the hand-over condition
+    assert '#route-map .street-map' in body  # the hand-over condition
     assert header('text') in body
+
+
+def test_the_served_page_spins_a_bike_until_the_map_is_there():
+    """The slow part of a cold load is the map, so the loading state has to outlive the
+    mount and the app has to stay hidden behind it until then."""
+    document = boot_document('<html><head></head><body><gradio-app></gradio-app></body></html>')
+    shell = document[document.index('id="boot-shell"'):document.index('<gradio-app')]
+    assert 'class="boot-loading"' in shell and '\N{BICYCLE}' in shell
+    assert 'is-booting' in shell  # added on boot, removed at the hand-over
+    assert 'bike-spin' in CSS and 'html.is-booting gradio-app { visibility: hidden; }' in CSS
+    # A boot that never renders a map must not leave the app hidden for ever.
+    assert 'setTimeout(() => { observer.disconnect(); handOver(); }, 20000)' in shell
+
+
+def test_the_spinning_bike_stops_for_reduced_motion():
+    reduced = CSS[CSS.index('@media (prefers-reduced-motion:reduce)'):]
+    assert '.boot-bike { animation:none; }' in reduced[:reduced.index('}\n')]
 
 
 def test_the_boot_shell_is_only_added_once():
