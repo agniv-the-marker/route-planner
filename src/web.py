@@ -1,6 +1,7 @@
 """Prompt-only app with an optional diagnostic view and development controls."""
 
 import logging
+import re
 import tempfile
 import threading
 from pathlib import Path
@@ -46,9 +47,47 @@ BOOT_BODY = (
 )
 
 
-def boot_document(html: str) -> str:
-    """Put the stylesheet and the static masthead into the HTML Gradio serves at `/`."""
-    return html.replace('</head>', f'{BOOT_HEAD}</head>', 1).replace(
+DESCRIPTION = 'Turn a shape or a drawing into a bicycle route through San Francisco.'
+PREVIEW_ALT = 'A loaded touring bicycle parked beside a lake at dusk.'
+# Gradio's template ships its own og:/twitter: tags, including an og:image pointing at a
+# Gradio banner. Scrapers take the first og:image they find, so ours has to replace them
+# rather than follow them.
+GRADIO_CARD = re.compile(r'\s*<meta\s+(?:property|name)="(?:og|twitter):[^"]*"[^>]*>')
+
+
+def link_preview(base_url: str) -> str:
+    """The card a chat app or a timeline shows for this page."""
+    # A card is fetched by someone else's crawler, so both URLs have to be absolute and
+    # reachable. Behind a TLS-terminating proxy the request can still describe itself as
+    # http; anything but a local address is served over https in practice.
+    if base_url.startswith('http://') and '//localhost' not in base_url and '//127.0.0.1' not in base_url:
+        base_url = 'https://' + base_url[len('http://'):]
+    image = f'{base_url}drawing-assets/preview.jpg'
+    return ''.join(f'<meta {key}="{name}" content="{value}">' for key, name, value in (
+        ('property', 'og:type', 'website'),
+        ('property', 'og:site_name', 'Route Sculptor'),
+        ('property', 'og:title', 'Route Sculptor'),
+        ('property', 'og:description', DESCRIPTION),
+        ('property', 'og:url', base_url),
+        ('property', 'og:image', image),
+        # Declared so a card reserves the right box before the image arrives.
+        ('property', 'og:image:width', '1200'),
+        ('property', 'og:image:height', '630'),
+        ('property', 'og:image:alt', PREVIEW_ALT),
+        ('name', 'twitter:card', 'summary_large_image'),
+        ('name', 'twitter:title', 'Route Sculptor'),
+        ('name', 'twitter:description', DESCRIPTION),
+        ('name', 'twitter:image', image),
+        ('name', 'twitter:image:alt', PREVIEW_ALT),
+        ('name', 'description', DESCRIPTION),
+    ))
+
+
+def boot_document(html: str, base_url: str = '/') -> str:
+    """Put the stylesheet, the link preview and the static masthead into the HTML
+    Gradio serves at `/`."""
+    html = GRADIO_CARD.sub('', html)
+    return html.replace('</head>', f'{link_preview(base_url)}{BOOT_HEAD}</head>', 1).replace(
         '<gradio-app', f'{BOOT_BODY}<gradio-app', 1)
 
 
@@ -239,7 +278,7 @@ def create_site(service=None):
         if request.url.path != '/' or not response.headers.get('content-type', '').startswith('text/html'):
             return response
         body = b''.join([chunk async for chunk in response.body_iterator]).decode('utf-8')
-        body = boot_document(body).encode('utf-8')
+        body = boot_document(body, str(request.base_url)).encode('utf-8')
         headers = {k: v for k, v in response.headers.items() if k.lower() != 'content-length'}
         return Response(content=body, status_code=response.status_code, headers=headers)
 

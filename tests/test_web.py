@@ -10,7 +10,7 @@ from PIL import Image
 from src.generation import GenerationResult
 from src.map_view import ASSETS
 from src.site_shell import header
-from src.web import boot_document, create_app
+from src.web import boot_document, create_app, link_preview
 
 
 class StubService:
@@ -163,3 +163,34 @@ def test_the_boot_shell_is_only_added_once():
     twice = boot_document(boot_document(
         '<html><head></head><body><gradio-app></gradio-app></body></html>'))
     assert twice.count('id="boot-shell"') == 2 and twice.count('<gradio-app') == 1
+
+
+def test_the_link_preview_replaces_gradios_own_card():
+    """Scrapers take the first og:image they find, and Gradio's template ships one
+    pointing at a Gradio banner."""
+    served = ('<html><head>'
+              '<meta\n\t\tproperty="og:image"\n\t\tcontent="https://raw.githubusercontent.com/x.jpg"\n\t/>'
+              '<meta property="og:title" content="Gradio"/>'
+              '<meta name="twitter:image" content="https://raw.githubusercontent.com/x.jpg"/>'
+              '<meta charset="utf-8"/>'
+              '</head><body><gradio-app></gradio-app></body></html>')
+    document = boot_document(served, 'https://example.test/')
+    assert 'raw.githubusercontent' not in document
+    assert document.count('property="og:image"') == 1
+    assert document.count('name="twitter:card"') == 1
+    assert '<meta charset="utf-8"/>' in document  # only the card tags are stripped
+    assert 'content="https://example.test/drawing-assets/preview.jpg"' in document
+
+
+def test_the_preview_is_absolute_https_and_the_declared_size():
+    from PIL import Image
+    card = link_preview('http://route-sculptor.example/')
+    assert 'content="https://route-sculptor.example/drawing-assets/preview.jpg"' in card
+    assert 'content="summary_large_image"' in card
+    # A localhost run stays on http, so a developer's own card still resolves.
+    assert 'content="http://127.0.0.1:7860/drawing-assets/preview.jpg"' in link_preview('http://127.0.0.1:7860/')
+    width = next(p for p in card.split('<meta ') if 'og:image:width' in p)
+    height = next(p for p in card.split('<meta ') if 'og:image:height' in p)
+    with Image.open(ASSETS / 'preview.jpg') as image:
+        assert image.size == (1200, 630), 'the declared card size must match the file'
+        assert f'content="{image.width}"' in width and f'content="{image.height}"' in height
