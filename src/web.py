@@ -7,7 +7,7 @@ from pathlib import Path
 
 import gradio as gr
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.responses import HTMLResponse, FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from src.generation import RouteService
@@ -19,6 +19,37 @@ from src.site_shell import header, footer
 
 CSS = (ASSETS / "site.css").read_text()
 THEME = gr.themes.Base(primary_hue="slate", neutral_hue="stone", radius_size="none")
+
+# Gradio 6 applies both `css=` and `head=` from the client config, so neither exists
+# until the front end has booted — which is exactly the window its full-page
+# "Loading…" overlay covers. These two go into the served document instead, so the
+# first paint is the site shell and the boot finishes behind it. See boot_document().
+BOOT_HEAD = f'<style>{CSS}\n[data-testid="status-tracker"]{{display:none !important;}}</style>'
+# A static copy of the masthead, laid out by the same rules as the real one, so the
+# page has its own furniture before Gradio mounts. It removes itself the moment the
+# real masthead exists — inside a MutationObserver callback, so the two never paint
+# together.
+BOOT_BODY = (
+    f'<div class="gradio-container" id="boot-shell">{header("text")}</div>'
+    '<script>(() => {'
+    ' const shell = document.getElementById("boot-shell");'
+    ' const observer = new MutationObserver(() => {'
+    # The block mounts a beat before its HTML lands, so wait for the real header
+    # element rather than its container — otherwise the page loses its masthead for
+    # a few frames in between.
+    '  if (!document.querySelector("#masthead-block #masthead")) return;'
+    '  observer.disconnect();'
+    '  shell.remove();'
+    ' });'
+    ' observer.observe(document.body, {childList: true, subtree: true});'
+    '})();</script>'
+)
+
+
+def boot_document(html: str) -> str:
+    """Put the stylesheet and the static masthead into the HTML Gradio serves at `/`."""
+    return html.replace('</head>', f'{BOOT_HEAD}</head>', 1).replace(
+        '<gradio-app', f'{BOOT_BODY}<gradio-app', 1)
 
 
 def loading_status(message):
@@ -167,8 +198,11 @@ def create_app(service=None):
                   js="(...args) => { window.RouteSculptorBusy.start('fit-button', 'fitting route'); return args; }")
         fitting_event.then(fn=None, js="() => window.RouteSculptorBusy.finish('fit-button')", queue=False)
         fitting_event.then(fn=show_fit, inputs=[last_result], outputs=[fit], queue=False)
-        another.click(fn=alternative,inputs=[last_result],outputs=outputs,
-                      concurrency_limit=1,concurrency_id='generation',api_name=False, show_progress='hidden')
+        another_event = another.click(fn=alternative,inputs=[last_result],outputs=outputs,
+                                      concurrency_limit=1,concurrency_id='generation',api_name=False, show_progress='hidden')
+        # ui.js marks the clicked map button busy; the re-rendered map usually removes
+        # it, so this only matters when the map came back unchanged or the call failed.
+        another_event.then(fn=None, js="() => window.RouteSculptorBusy.finishAction('another')", queue=False)
         appearance = [streets, opacity, terrain, outline, palette, typography, color]
         gr.on(triggers=[c.change for c in appearance], fn=None, inputs=appearance, queue=False,
               js="""(streets, opacity, terrain, outline, palette, type, color) => {
@@ -198,6 +232,16 @@ def create_site(service=None):
     # a cold "find a ride" past the browser's abort timeout.
     threading.Thread(target=lambda: drawing_service.router, daemon=True).start()
     site.mount('/drawing-assets', StaticFiles(directory=ASSETS), name='drawing-assets')
+
+    @site.middleware('http')
+    async def boot_straight_into_the_page(request, call_next):
+        response = await call_next(request)
+        if request.url.path != '/' or not response.headers.get('content-type', '').startswith('text/html'):
+            return response
+        body = b''.join([chunk async for chunk in response.body_iterator]).decode('utf-8')
+        body = boot_document(body).encode('utf-8')
+        headers = {k: v for k, v in response.headers.items() if k.lower() != 'content-length'}
+        return Response(content=body, status_code=response.status_code, headers=headers)
 
     @site.get('/favicon.ico', include_in_schema=False)
     def favicon():

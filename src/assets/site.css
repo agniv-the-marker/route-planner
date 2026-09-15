@@ -35,6 +35,10 @@ body::before { content:""; position:fixed; top:0; bottom:0; left:max(0px,calc((1
      but pin it so the three headers share one cascade. */
   font: 400 var(--mono-md)/1.5 var(--mono); }
 #masthead-block, #credits-block { padding:0 !important; border:0 !important; background:none !important; min-height:0 !important; }
+/* The static masthead served before Gradio mounts. Inside the container Gradio's own
+   `.main` wrapper is capped at 1024px and centred, so the boot shell's header copies that
+   box; otherwise the header jumps sideways when the mounted app replaces it. */
+#boot-shell > .site-header { max-width: 1024px; margin-left: auto; margin-right: auto; }
 /* Gradio pads every HTML block; strip it so the masthead/footer align with the static pages. */
 #masthead-block .html-container, #credits-block .html-container, #route-map .html-container { padding:0 !important; }
 .site-shell, .site-shell *, .site-shell *::before, .site-shell *::after { box-sizing:border-box; }

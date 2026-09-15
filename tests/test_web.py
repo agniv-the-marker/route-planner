@@ -8,7 +8,9 @@ import pytest
 from PIL import Image
 
 from src.generation import GenerationResult
-from src.web import create_app
+from src.map_view import ASSETS
+from src.site_shell import header
+from src.web import boot_document, create_app
 
 
 class StubService:
@@ -123,3 +125,41 @@ def test_the_preselection_reset_matches_the_gallery(app):
     result.diagnostics = {'valid_candidates': [0, 1]}
     assert state.fn(result) == 0
     assert state.fn(GenerationResult()) is None
+
+
+def test_the_alternative_route_clears_its_busy_button_when_the_map_is_unchanged(app):
+    """ui.js marks the clicked map button busy; something has to release it."""
+    another = next(block for block in app.blocks.values()
+                   if getattr(block, 'elem_id', None) == 'another-button')
+    alternative = next(fn for fn in app.fns.values() if another._id in fn.targets[0])
+    release = next(fn for fn in app.fns.values() if fn.js and 'finishAction' in fn.js)
+    assert release.trigger_after == alternative._id
+    assert "finishAction('another')" in release.js
+
+
+def test_the_map_button_and_its_proxy_agree_on_the_action_name():
+    from src.map_view import markup
+    assert 'data-main-action="another"' in markup(another=True)
+    assert 'data-main-action="another"' not in markup()
+    ui = (ASSETS / 'ui.js').read_text()
+    assert 'RouteSculptorBusy.mark(action' in ui
+    assert "getElementById('another-button')" in ui
+
+
+def test_the_served_page_carries_the_stylesheet_and_masthead_before_gradio_boots():
+    """Gradio applies `css=`/`head=` from its client config, which is exactly the window
+    its full-page 'Loading…' overlay covers. Both must be in the served document."""
+    document = boot_document('<html><head><title>x</title></head>'
+                             '<body><gradio-app></gradio-app></body></html>')
+    head, body = document.split('</head>')
+    assert '[data-testid="status-tracker"]{display:none !important;}' in head
+    assert 'gradio-container' in head and '#masthead' in head  # the whole stylesheet
+    assert body.index('id="boot-shell"') < body.index('<gradio-app')
+    assert '#masthead-block #masthead' in body  # the hand-over condition
+    assert header('text') in body
+
+
+def test_the_boot_shell_is_only_added_once():
+    twice = boot_document(boot_document(
+        '<html><head></head><body><gradio-app></gradio-app></body></html>'))
+    assert twice.count('id="boot-shell"') == 2 and twice.count('<gradio-app') == 1

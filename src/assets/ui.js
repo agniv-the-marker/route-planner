@@ -39,9 +39,14 @@
   backdrop.onclick = close;
   // Proxy only the action. Never move nodes owned by Gradio into map HTML.
   document.addEventListener('click', event => {
-    if (event.target.closest('[data-main-action="another"]')) {
-      document.getElementById('another-button')?.click();
-    }
+    const action = event.target.closest('[data-main-action="another"]');
+    if (!action) return;
+    // The alternative search runs on the server for a second or more. Show the busy
+    // bike on the button that was actually clicked, before the round trip starts,
+    // and ignore repeat clicks until the map comes back.
+    if (action.classList.contains('is-busy')) return;
+    window.RouteSculptorBusy.mark(action, 'finding another route');
+    document.getElementById('another-button')?.click();
   });
   document.addEventListener('keydown', e => {
     if (!current) return;
