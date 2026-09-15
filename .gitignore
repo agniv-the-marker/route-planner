@@ -132,6 +132,10 @@ dmypy.json
 .pyre/
 
 # Route Sculptor
+outputs/
+cache/
+data/*.pending.graphml
+.modal.toml
 checkpoints/
 wandb/
 *.pt
@@ -140,3 +144,14 @@ wandb/
 route_cache/
 .idea/
 .vscode/
+
+# Derived, hash-keyed CPU street indexes
+data/search-index/
+
+# Derived geodata: hundreds of MB, two files over GitHub's 100MB limit.
+# Rebuild with scripts/prepare_map.py and scripts/prepare_region.py; the v2 graph's
+# SHA-256 is recorded in CLAUDE.md, and data/*.json keeps the metadata.
+data/*.graphml
+data/*.svg
+data/*.npy
+experiments/*.lock

@@ -1,0 +1,128 @@
+@import url('https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500&family=JetBrains+Mono:wght@400&display=swap');
+:root { --route-color: #637baa; --street-opacity: .43; --street-display: block; --outline-display: none;
+  --page-paper: #fafafa; --map-paper: #f1f2ec; --title-font: 'EB Garamond', Georgia, serif;
+  --mono: 'JetBrains Mono', monospace;
+  /* One mono scale for all chrome: controls/nav at --mono-lg, secondary text at --mono-md. */
+  --mono-lg: 12px; --mono-md: 11px; --body-size: 21px; }
+html { overflow-y:scroll; }
+body { margin:0; background:#fff !important; color:#343b35; }
+.gradio-container, .site-shell, .draw-page { background: var(--page-paper) !important; min-height:100vh; }
+/* A quiet paper/film texture over the page, kept out of the interaction layer. */
+body::before { content:""; position:fixed; top:0; bottom:0; left:max(0px,calc((100vw - 1080px)/2)); right:max(0px,calc((100vw - 1080px)/2)); z-index:10000; pointer-events:none; opacity:.32; mix-blend-mode:multiply;
+  /* Own compositor layer: otherwise every map repaint re-multiplies the whole column on the main thread. */
+  transform:translateZ(0); contain:layout paint style;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.15' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.7'/%3E%3C/svg%3E"); background-size:160px 160px; }
+.gradio-container, .site-shell, .draw-page { width: 100% !important; box-sizing: border-box; max-width: 1080px !important;
+  margin: auto !important; padding: 22px 24px 32px !important; animation:page-in .3s ease-out both; }
+.gradio-container > .main { width: 100% !important; padding: 0 !important; }
+#masthead { box-sizing:border-box; width:100%; border-bottom:1px solid #d9dad5; padding:0 0 12px; margin:0 0 16px; min-height:49px; }
+#masthead-block, #credits-block { padding:0 !important; border:0 !important; background:none !important; min-height:0 !important; }
+/* Gradio pads every HTML block; strip it so the masthead/footer align with the static pages. */
+#masthead-block .html-container, #credits-block .html-container, #route-map .html-container { padding:0 !important; }
+.site-shell, .site-shell *, .site-shell *::before, .site-shell *::after { box-sizing:border-box; }
+.site-header, .site-header nav { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.wordmark { display:flex; align-items:center; gap:8px; font: 400 30px/36px var(--title-font); letter-spacing: -.6px; color: #353c35; white-space: nowrap; }
+.wordmark img { width:28px; height:28px; object-fit:cover; border-radius:50%; mix-blend-mode:multiply; }
+.site-header a { text-decoration: none; }
+.site-header nav { font: 400 var(--mono-lg)/18px var(--mono); }
+.site-header nav a, .site-header button { color: #687367; }
+.site-header button { border: 0; padding: 8px 0; background: none; font: inherit; cursor: pointer; }
+html:not([data-debug="true"]) [data-open="debug"], html:not([data-dev="true"]) [data-open="dev"] { display: none; }
+#prompt-bar { gap: 10px; align-items: stretch; }
+#prompt-box { border: 1px solid #d9dad5 !important; border-radius: 0 !important; }
+#prompt-box, #prompt-box textarea { background: var(--page-paper) !important; }
+#prompt-box textarea { font: var(--body-size) 'EB Garamond', Georgia, serif; padding: 12px !important; }
+#generate-button { border-radius: 0 !important; background: var(--route-color) !important; border-color: var(--route-color) !important;
+  color: white !important; font: var(--mono-lg) var(--mono); box-shadow: none; min-height: 48px; white-space: nowrap; }
+#status { min-height: 0; padding: 0; }
+/* Busy state lives in the button: no layout shift or separate progress bar. */
+button.is-busy, #fit-button.is-busy, #generate-button.is-busy { font-size:0 !important; cursor:wait !important; }
+button.is-busy > * { display:none !important; }
+button.is-busy::before { content:attr(data-busy-label); font:400 var(--mono-lg)/18px var(--mono); }
+button.is-busy::after { content:"🚲"; display:inline-block; position:relative; top:-3px; margin-left:10px;
+  font:12px/18px sans-serif; animation:bike-spin 1.6s linear infinite; vertical-align:middle; }
+@keyframes bike-spin { to { transform:rotate(360deg); } }
+@keyframes page-in { from { opacity:0; } to { opacity:1; } }
+@media (prefers-reduced-motion:reduce) { .gradio-container,.site-shell,.draw-page { animation:none !important; } button.is-busy::after { animation:none; } }
+[data-testid="status-tracker"], .generating .progress-bar, .generating .progress-text, .generating .eta { display:none !important; }
+#status:has(.prose:empty) { display: none; }
+#status p, #credits p, .block label { font: var(--mono-md)/1.5 var(--mono) !important; color: #677062; }
+#credits { box-sizing:border-box; width:100%; margin:32px 0 0; padding:16px 0 0; border-top:1px solid #d9dad5; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; text-align:left; font:400 var(--mono-md)/16px var(--mono); color:#677062; }
+#credits > a:last-child { margin-left:auto; }
+#credits a { color:inherit; }
+#credits p { font-size: var(--mono-md) !important; }
+#results { align-items: center; }
+.gradio-container #results { display:none !important; }
+#shape-preview { max-width: 180px; background: transparent !important; border-radius: 0 !important; }
+#results button { max-width: 200px; border-radius: 0; font: var(--mono-lg) var(--mono); }
+#tools { min-height: 0; gap: 0; }
+#tools .block { border-radius: 0 !important; }
+.street-map { border: 1px solid #d7dad2; background: var(--map-paper); position: relative; overflow: hidden;
+  /* The map already clips; containment stops its repaints from damaging the rest of the page. */
+  contain: layout paint style; }
+.map-canvas { display: block; width: 100%; aspect-ratio: 1; cursor: grab; touch-action: none; }
+/* During a drag the SVG is translated on the compositor and committed to viewBox on release. */
+.map-canvas.is-panning { will-change: transform; }
+.map-canvas:active { cursor: grabbing; }
+.map-eyebrow, .map-bottom { display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  font: var(--mono-md) var(--mono); color: #667260; padding: 8px 12px; }
+.map-eyebrow { border-bottom: 1px solid #dde0d8; }
+.map-bottom { border-top: 1px solid #dde0d8; }
+.map-bottom > div { display: flex; flex-shrink: 0; gap: 4px; }
+/* Download GPX is an <a download> for real, but it belongs in the control row, so it
+   wears the same chrome as the zoom buttons beside it. */
+.map-bottom button, .map-bottom .map-action { background: transparent; border: 1px solid #c8cfc2; padding: 8px 12px; font: inherit;
+  color: #667260; cursor: pointer; min-width: 36px; min-height: 36px; }
+.map-bottom .map-action { display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box;
+  text-decoration: none; white-space: nowrap; }
+.map-bottom button:hover, .map-bottom .map-action:hover { border-color: var(--route-color); color: var(--route-color); }
+.streets { opacity: var(--street-opacity); display: var(--street-display); }
+.reference-outline { display: var(--outline-display); }
+.neighborhoods { font: 7.5px var(--mono); fill: #818c7e; text-anchor: middle; pointer-events: none; }
+.neighborhoods text { paint-order: stroke; stroke: var(--map-paper); stroke-width: 2px; stroke-linejoin: round; }
+.ride { vector-effect: non-scaling-stroke; }
+
+.route-progress-emoji { font-size:11px; pointer-events:all; cursor:grab; }
+.route-progress-marker { cursor:grab; }
+.route-progress-marker:active { cursor:grabbing; }
+.route-progress-bike { pointer-events:none; user-select:none; }
+.route-play { border:1px solid #c8cfc2; background:rgba(255,255,255,.55); color:var(--route-color); width:28px; height:28px; cursor:pointer; font:var(--mono-lg) var(--mono); }
+.route-elevation-marker { display:none !important; }
+.route-elevation-dot { fill:var(--route-color); stroke:#fff; stroke-width:1; }
+.map-bottom > .route-play { order:-1; margin-right:auto; }
+.map-bottom > span:empty { display:none; }
+#fit-button, #fit-button button, #fit-button * { font:var(--mono-lg) var(--mono) !important; }
+.terrain { image-rendering: auto; opacity: var(--terrain-opacity, 1); }
+.elevation-profile { border: 1px solid #d7dad2; border-top: 0; background: var(--page-paper); }
+.elevation-profile svg { display: block; width: 100%; max-height: 100px; }
+#popup-backdrop { position: fixed; inset: 0; z-index: 9998; background: #28312966; backdrop-filter: blur(2px); }
+#popup-backdrop[hidden] { display: none; }
+body.popup-open { overflow: hidden; }
+.popup { display: none !important; position: fixed !important; z-index: 9999; top: 50%; left: 50%;
+  transform: translate(-50%, -50%); width: min(880px, calc(100vw - 40px)) !important;
+  max-height: calc(100dvh - 48px); overflow: auto !important; overscroll-behavior: contain;
+  background: var(--page-paper); border: 1px solid #c8cfc2; padding: 20px !important;
+  box-shadow: 0 20px 80px #0002; }
+.popup.is-open { display: flex !important; }
+.popup-header { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.popup-header h2 { font: 400 30px/36px var(--title-font); margin: 0; color: #353c35; }
+.popup-header button { border: 1px solid #c8cfc2; background: none; color: #353c35; font-size: 24px;
+  cursor: pointer; min-width: 44px; min-height: 44px; }
+footer:not(#credits) { display: none !important; }
+@media(max-width: 600px) {
+  .gradio-container, .site-shell, .draw-page { padding: 14px 12px 24px !important; }
+  .wordmark { font-size:27px; line-height:36px; }
+  .site-header, .site-header nav { gap: 12px; }
+  #prompt-bar { flex-wrap: nowrap !important; }
+  #prompt-box { min-width: 0 !important; }
+  #prompt-box textarea { font-size: 18px; white-space: nowrap; overflow: hidden; }
+  #generate-button { min-width: 108px !important; font-size: var(--mono-md); }
+  /* Too narrow for the busy label; the spinning bike carries the state on its own. */
+  #generate-button.is-busy::before { display: none; }
+  #generate-button.is-busy::after { margin-left: 0; }
+  .map-eyebrow, .map-bottom { padding: 8px; font-size: var(--mono-md); }
+  .map-bottom button, .map-bottom .map-action { padding: 8px; min-width: 40px; min-height: 40px; }
+  #map-controls { flex-direction: column !important; }
+  .popup { width: calc(100vw - 20px) !important; padding: 14px !important; max-height: calc(100dvh - 24px); }
+  .popup-header h2 { font-size: 27px; }
+}

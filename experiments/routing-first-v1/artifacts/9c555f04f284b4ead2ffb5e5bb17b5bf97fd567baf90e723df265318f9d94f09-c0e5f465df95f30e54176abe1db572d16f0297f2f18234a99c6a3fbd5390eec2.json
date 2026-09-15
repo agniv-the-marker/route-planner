@@ -1,0 +1,10 @@
+{
+  "status": "completed",
+  "metadata_path": "data/sf-palo-alto-v2.json",
+  "nodes": 114226,
+  "edges": 268649,
+  "graph_sha256": "97e8180a8ccad50f29226ab22e4676450bd20a40ac6c103424e523766b552410",
+  "spend_usd": 0,
+  "parent": "data/sf-palo-alto-v1.graphml",
+  "prepared": "2026-09-06T01:26:58.775904+00:00"
+}

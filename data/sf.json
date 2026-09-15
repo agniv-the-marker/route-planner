@@ -1,0 +1,14 @@
+{
+  "preparation": "sf-bike-v1",
+  "frame": "MapFrame(latitude=37.76, longitude=-122.45, width_m=10000.0, size=512)",
+  "crs": "EPSG:32610",
+  "downloaded_at": "2026-09-05T02:52:37.898514+00:00",
+  "osmnx": "2.1.0",
+  "network_type": "bike",
+  "custom_filter": null,
+  "nodes": 15701,
+  "edges": 38573,
+  "sha256": "6d2909f0b3d1f9ae5ca7612e99127a98872140b98f799c111f61df32853d6d1d",
+  "attribution": "\u00a9 OpenStreetMap contributors, ODbL 1.0",
+  "limitations": "Conservative direction/access filtering; no turn-restriction relations or live closures."
+}

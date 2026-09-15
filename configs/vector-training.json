@@ -1,0 +1,50 @@
+{
+  "sft": {
+    "method": "sft",
+    "model": "Qwen/Qwen2.5-Coder-7B-Instruct",
+    "revision": "c03e6d358207e414f1eca0bb1891e29f1db0e242",
+    "lora": {
+      "r": 16,
+      "alpha": 32,
+      "target_modules": [
+        "q_proj",
+        "v_proj"
+      ]
+    },
+    "num_generations": 4,
+    "max_completion_length": 1536,
+    "router_processes": "one StreetSearch instance per CPU process",
+    "reward": "src.route_reward.reward",
+    "training_enabled": false,
+    "requires": [
+      "subject-family split",
+      "licensed sources",
+      "human-calibrated reward >=80% on >=50 comparisons",
+      "24/30 outlines and 18/30 routes recognizable"
+    ]
+  },
+  "grpo": {
+    "method": "grpo",
+    "model": "Qwen/Qwen2.5-Coder-7B-Instruct",
+    "revision": "c03e6d358207e414f1eca0bb1891e29f1db0e242",
+    "lora": {
+      "r": 16,
+      "alpha": 32,
+      "target_modules": [
+        "q_proj",
+        "v_proj"
+      ]
+    },
+    "num_generations": 4,
+    "max_completion_length": 1536,
+    "router_processes": "one StreetSearch instance per CPU process",
+    "reward": "src.route_reward.reward",
+    "training_enabled": false,
+    "requires": [
+      "subject-family split",
+      "licensed sources",
+      "human-calibrated reward >=80% on >=50 comparisons",
+      "24/30 outlines and 18/30 routes recognizable"
+    ]
+  }
+}

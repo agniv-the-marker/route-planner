@@ -1,0 +1,18 @@
+{
+  "key": "46a9708f615a02c1abed7911792ac4979ecf473eeaa5d4d6d418c8adc98a47e6",
+  "attempt": "lemur",
+  "stage": "diffusion-inference",
+  "identity": {
+    "model": "Tongyi-MAI/Z-Image-Turbo",
+    "revision": "f332072aa78be7aecdf3ee76d5c247082da564a6",
+    "prompt": "lemur",
+    "seed": 172930962,
+    "steps": 9,
+    "guidance": 0.0,
+    "request_id": "lemur",
+    "template": "A crisp two-tone vector silhouette pictogram. Subject: {prompt}. Depict exactly this subject and its requested pose, with recognizable proportions and distinctive outer features. One complete solid jet-black cut-paper shape centered on a pure white square canvas. The subject occupies the central 70 percent of the canvas, with a wide empty white margin on every side. Keep the whole subject visible, including extremities. Use a clean, simple continuous outer boundary. Flat black fill throughout the subject; blank white outside. The image contains only the subject silhouette, without lettering, decorations, a frame, scenery, shadows, texture or a surrounding badge.",
+    "image_size": 1024
+  },
+  "state": "pending",
+  "created": "2026-09-14T16:33:21.683647+00:00"
+}

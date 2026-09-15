@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>About</title>
+  <link rel="icon" type="image/webp" href="/drawing-assets/bike-mark.webp">
+  <link rel="stylesheet" href="/drawing-assets/site.css">
+  <style>
+    .about-copy { max-width:760px; font:var(--body-size)/1.55 'EB Garamond',Georgia,serif; margin:32px 0 0; }
+    .about-copy a { color:#526b96; text-underline-offset:3px; }
+    .about-copy h2 { font-size:28px; font-weight:400; margin:32px 0 16px; }
+    .about-copy p { margin:0 0 20px; }
+    .about-copy p.lead { font-size:calc(var(--body-size) + 3px); line-height:1.5; }
+    @media(max-width:600px) { .about-copy { margin-top:24px; } .about-copy h2 { font-size:25px; } }
+  </style>
+</head>
+<body><main class="site-shell">
+  {{HEADER}}
+  <article class="about-copy">
+  <p class="lead">Describe something you'd like to ride, or draw it yourself. Route Sculptor makes a few silhouettes from your words, then lets you pick your favorite. It tries different sizes and positions around San Francisco and looks for connected streets that follow the shape. You can explore the ride and its hills, then download a GPX file to take it with you.</p>
+  <h2>Papers and model</h2>
+  <p><a href="https://duepublico2.uni-due.de/servlets/MCRFileNodeServlet/duepublico_derivate_00072443/Waschk_et_al_Automatic_Route_Planning.pdf">Waschk and Krüger (2019), Automatic Route Planning</a>: the research behind matching a drawing to connected streets.</p>
+  <p><a href="https://arxiv.org/abs/2511.22699">Z-Image Team (2025), Z-Image</a>: <a href="https://huggingface.co/Tongyi-MAI/Z-Image-Turbo">Z-Image-Turbo</a> creates the text-based silhouettes.</p>
+  <p>Site mark: the blue bicycle drawing comes from <a href="https://www.cosmos.so/search/elements/Bicycle%20Logo%20Exploration?origin=caption">Bicycle Logo Exploration</a> by <a href="https://www.cosmos.so/search/elements/George%20Bokhua?origin=caption">George Bokhua</a>.</p>
+  <h2>Map and terrain data</h2>
+  <p>Streets: <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>. Hills and elevation: <a href="https://registry.opendata.aws/terrain-tiles/">Mapzen terrain tiles on AWS Open Data</a>, using USGS and NOAA sources. The map is a snapshot and does not know about live closures or turn restrictions.</p>
+  </article>
+  {{FOOTER}}
+</main></body>
+</html>

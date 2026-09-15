@@ -1,0 +1,25 @@
+{
+  "key": "67684c079d3ca9005c39ebd80da05047e3f4e77561bcfd5c82160ad24586d0f9",
+  "attempt": "a bicycle",
+  "stage": "diffusion-inference",
+  "identity": {
+    "model": "Tongyi-MAI/Z-Image-Turbo",
+    "revision": "f332072aa78be7aecdf3ee76d5c247082da564a6",
+    "prompt": "a bicycle",
+    "seed": 4146587233,
+    "steps": 9,
+    "guidance": 0.0,
+    "request_id": "a bicycle",
+    "template": "A crisp two-tone vector silhouette pictogram. Subject: {prompt}. Depict exactly this subject and its requested pose, with recognizable proportions and distinctive outer features. One complete solid jet-black cut-paper shape centered on a pure white square canvas. The subject occupies the central 70 percent of the canvas, with a wide empty white margin on every side. Keep the whole subject visible, including extremities. Use a clean, simple continuous outer boundary. Flat black fill throughout the subject; blank white outside. The image contains only the subject silhouette, without lettering, decorations, a frame, scenery, shadows, texture or a surrounding badge.",
+    "image_size": 1024
+  },
+  "state": "completed",
+  "created": "2026-09-14T14:22:22.586876+00:00",
+  "remote": true,
+  "reservation": "diffusion-67684c079d3ca9005c39ebd8",
+  "started": "2026-09-14T14:22:23.135295+00:00",
+  "remote_job_id": "fc-01M2G4RD12PN4E2MWSZEV1Z3M8",
+  "artifact": "artifacts/67684c079d3ca9005c39ebd80da05047e3f4e77561bcfd5c82160ad24586d0f9-2b726480513e2d8c573ce72502c1568cae92cf163cd84fdfcf8e8b192623a1b3.json",
+  "artifact_hash": "2b726480513e2d8c573ce72502c1568cae92cf163cd84fdfcf8e8b192623a1b3",
+  "ended": "2026-09-14T14:22:29.587434+00:00"
+}

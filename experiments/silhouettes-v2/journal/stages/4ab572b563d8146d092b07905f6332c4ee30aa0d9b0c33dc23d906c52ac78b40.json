@@ -1,0 +1,25 @@
+{
+  "key": "4ab572b563d8146d092b07905f6332c4ee30aa0d9b0c33dc23d906c52ac78b40",
+  "attempt": "a butterfly",
+  "stage": "diffusion-inference",
+  "identity": {
+    "model": "Tongyi-MAI/Z-Image-Turbo",
+    "revision": "f332072aa78be7aecdf3ee76d5c247082da564a6",
+    "prompt": "a butterfly",
+    "seed": 3071280918,
+    "steps": 9,
+    "guidance": 0.0,
+    "request_id": "a butterfly",
+    "template": "A crisp two-tone vector silhouette pictogram. Subject: {prompt}. Depict exactly this subject and its requested pose, with recognizable proportions and distinctive outer features. One complete solid jet-black cut-paper shape centered on a pure white square canvas. The subject occupies the central 70 percent of the canvas, with a wide empty white margin on every side. Keep the whole subject visible, including extremities. Use a clean, simple continuous outer boundary. Flat black fill throughout the subject; blank white outside. The image contains only the subject silhouette, without lettering, decorations, a frame, scenery, shadows, texture or a surrounding badge.",
+    "image_size": 1024
+  },
+  "state": "completed",
+  "created": "2026-09-14T14:02:01.756557+00:00",
+  "remote": true,
+  "reservation": "diffusion-4ab572b563d8146d092b0790",
+  "started": "2026-09-14T14:02:02.260542+00:00",
+  "remote_job_id": "fc-01M2G3K4S10KGG6SPK109D9A57",
+  "artifact": "artifacts/4ab572b563d8146d092b07905f6332c4ee30aa0d9b0c33dc23d906c52ac78b40-4c34698ce304f81fe14455931d670987e5355191378c0f312c9039b2304d2004.json",
+  "artifact_hash": "4c34698ce304f81fe14455931d670987e5355191378c0f312c9039b2304d2004",
+  "ended": "2026-09-14T14:02:43.731020+00:00"
+}

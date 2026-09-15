@@ -1,0 +1,28 @@
+{
+  "version": "routing-v1",
+  "max_distance_m": 30000,
+  "min_distance_m": 0,
+  "wall_seconds": 120,
+  "work_budget": 3000000,
+  "angles": [
+    -15,
+    0,
+    15
+  ],
+  "span_fractions": [
+    0.08,
+    0.15,
+    0.25
+  ],
+  "anchor_spacing_m": 600,
+  "snap_m": 300,
+  "candidates": 2,
+  "beam_width": 6,
+  "placements": 6,
+  "grid_m": 2500,
+  "deviation_weight": 16,
+  "deviation_scale_m": 100,
+  "closed": false,
+  "max_repeated": null,
+  "quality_tie_m": 10
+}

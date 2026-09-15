@@ -1,0 +1,25 @@
+{
+  "key": "4248dc381432f85174ddb5e1f65bc4de7ae510cb1797c2ef1169be00fdace7ad",
+  "attempt": "a horse",
+  "stage": "diffusion-inference",
+  "identity": {
+    "model": "Tongyi-MAI/Z-Image-Turbo",
+    "revision": "f332072aa78be7aecdf3ee76d5c247082da564a6",
+    "prompt": "a horse",
+    "seed": 1637815424,
+    "steps": 9,
+    "guidance": 0.0,
+    "request_id": "a horse",
+    "template": "A crisp two-tone vector silhouette pictogram. Subject: {prompt}. Depict exactly this subject and its requested pose, with recognizable proportions and distinctive outer features. One complete solid jet-black cut-paper shape centered on a pure white square canvas. The subject occupies the central 70 percent of the canvas, with a wide empty white margin on every side. Keep the whole subject visible, including extremities. Use a clean, simple continuous outer boundary. Flat black fill throughout the subject; blank white outside. The image contains only the subject silhouette, without lettering, decorations, a frame, scenery, shadows, texture or a surrounding badge.",
+    "image_size": 1024
+  },
+  "state": "completed",
+  "created": "2026-09-14T13:45:56.493321+00:00",
+  "remote": true,
+  "reservation": "diffusion-4248dc381432f85174ddb5e1",
+  "started": "2026-09-14T13:45:57.043476+00:00",
+  "remote_job_id": "fc-01M2G2NP6J5M872KJSVZJSEWR9",
+  "artifact": "artifacts/4248dc381432f85174ddb5e1f65bc4de7ae510cb1797c2ef1169be00fdace7ad-9bc5a9046c11c7bbb146fc977ccb25e21bb775f0bcb40b27587e11d8085b7d0f.json",
+  "artifact_hash": "9bc5a9046c11c7bbb146fc977ccb25e21bb775f0bcb40b27587e11d8085b7d0f",
+  "ended": "2026-09-14T13:46:03.668295+00:00"
+}

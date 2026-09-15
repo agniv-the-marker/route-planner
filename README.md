@@ -1,93 +1,124 @@
 # Route Sculptor
 
-Generate rideable GPX bike routes in San Francisco that trace the shape of any concept. Type "horse" and get a horse-shaped bike route through real streets.
+Describe a shape and Route Sculptor generates four Stable Diffusion silhouettes, extracts a
+validated outer contour, and searches for a matching SF bicycle-street loop.
+then searches for it as a closed bicycle street loop in San Francisco. The site shows the
+shape, the route, distance, and a GPX download. The fixed map is 10 × 10 km, centered near
+Twin Peaks (37.76, -122.45).
 
-## How It Works
+`claude --resume "route-sculptor-local-modal-setup" --dangerously-skip-permissions`
 
-```
-"horse" → SD 1.5 silhouette → binary threshold → contour extraction →
-         placement on SF map → graph-based road routing → GPX file
-```
+## Run locally
 
-1. **Image Generation**: SD 1.5 generates a black silhouette from text (or loads a pre-made SVG)
-2. **Post-Processing**: Otsu threshold + corner brightness check + small blob removal → pure black on white
-3. **Contour Extraction**: OpenCV RETR_TREE hierarchy extracts outer boundary + inner details (eyes, etc.)
-4. **Placement**: Grid search over position × scale × rotation on SF map, scored by coverage
-5. **Waypoint Sampling**: Curvature-adaptive sampling (more points at sharp corners) + 150m max gap densification
-6. **Graph Routing**: Local OSM bike network (104K nodes) with Dijkstra + backtrack penalty
-7. **GPX Export**: Standard GPX loadable in Strava, Komoot, or any GPS device
-
-## Setup
+Python 3.12 or newer:
 
 ```bash
-python3 -m venv .venv && source .venv/bin/activate
-pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
-pip install -e ".[dev]"
-
-# Download SF bike network (one-time, ~130MB)
-python -c "import osmnx as ox; G = ox.graph_from_place('San Francisco, California, USA', network_type='bike', custom_filter='[\"route\"!~\"ferry\"]'); ox.save_graphml(G, 'data/sf_bike_graph.graphml')"
+python3 -m venv .venv
+.venv/bin/pip install -e '.[dev,modal]'
+GRADIO_ANALYTICS_ENABLED=False .venv/bin/python -m src.web
 ```
 
-## Usage
+Open http://127.0.0.1:7860. `/about` explains the pipeline and data sources. There is no
+local model to download: describing an exact catalogue name (see `src/assets/symbols.json`)
+resolves instantly and for free; anything else calls a small model deployed on Modal (see
+below) that only ever *picks* one of the catalogue shapes, so it never returns something
+that fails to parse as a valid outline.
 
-### Generate a route (GPU via Modal)
+The prepared bicycle network is in `data/sf.graphml`, with its preparation date, settings,
+and SHA-256 in `data/sf.json`. To deliberately rebuild it from OSM:
+
 ```bash
-modal run scripts/modal_inference.py --concept horse --preview
-# Output: outputs/horse/route.gpx + silhouette.png + map_overlay.png
+.venv/bin/python -m scripts.prepare_map
+.venv/bin/python -m scripts.prepare_terrain
 ```
 
-### Batch generation
+Map data © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright),
+ODbL 1.0. No map tiles or routing service are needed at request time.
+
+## Debug and dev views
+
+- **Debug popup (`/?debug=true`):** the interpreted silhouette, the placed outline and
+  candidate positions on the map, measured stage durations (interpretation / search / cache),
+  and a JSON block with the exact interpretation, transform, and scores needed to reproduce
+  the run.
+- **Dev popup (`/?dev=true`):** street visibility/opacity, terrain opacity, a toggle for the
+  placed reference outline, page palette, headline type, and route color. Appearance changes
+  apply only in the browser tab; Reset restores defaults.
+- **Map:** drag to pan within the fixed bounds, scroll or use buttons to zoom. At full
+  zoom-out panning is locked. Keyboard `+`, `-`, and `0` zoom and reset. Terrain uses
+  elevation-driven dither and hill shading adapted from
+  [ferryri.de](https://github.com/agniv-the-marker/ferryri.de), with higher-resolution
+  Mapzen/USGS terrain tiles and the reference site's MTC/ABAG coastline. A successful route
+  includes an approximate ground-elevation profile.
+
+Combine `/?debug=true&dev=true` to enable both popups. Close with Escape or the close button.
+Neither popup appears on the normal page.
+
+## How a description becomes a route
+
+1. **Interpret** (`src/symbols.py`): the description is matched to a catalogue key directly
+   (case/whitespace-normalized), or, if that fails, sent to a small model
+   (Qwen3-4B-Instruct-2507) deployed on Modal that must return one of the catalogue names
+   (or `none`) plus a small tilt/aspect adjustment via guided JSON decoding. The catalogue
+   itself (`src/assets/symbols.json`, ~150 entries) is compiled offline from pinned Material
+   Design Icons SVGs (`scripts/prepare_symbols.py`) — outer boundary only, simplified and
+   validated as a simple closed polygon. The model can never hand back a shape that isn't
+   already known-good.
+2. **Search** (`src/street_search.py`): the outline is tried at many positions, rotations,
+   and scales across the map; a directed street graph is matched to its perimeter with a
+   cyclic dynamic program that keeps actual street curves and rejects excessive detours,
+   disconnected paths, degenerate loops, and routes that reuse more than 20% of the same
+   physical street length. Up to three qualifying alternatives are kept.
+3. **Export**: GPX, an SVG map overlay, and an elevation profile are built directly from the
+   chosen route's coordinates.
+
+Disconnected placements, large detours, and degenerate loops fail with an explanation and no
+GPX; the interpreted shape remains visible so you can see what was understood. The map
+conservatively filters access and direction tags, including steps and ferries. It does not
+implement turn-restriction relations or live closures. Check current access and conditions
+before riding.
+
+## Symbol interpretation and Modal
+
+The interpreter model runs as its own Modal app, separate from the website:
+
 ```bash
-# All pre-made silhouettes (no GPU needed)
-PYTHONPATH=. python scripts/batch_generate.py --svg-only
-
-# With SD 1.5 (needs GPU or Modal)
-PYTHONPATH=. python scripts/batch_generate.py --use-sd horse dog cat star heart
+MODAL_PROFILE=nyro-robotics modal deploy scripts/modal_symbols.py   # the LLM symbol picker
+MODAL_PROFILE=nyro-robotics modal deploy scripts/modal_app.py       # the CPU website itself
 ```
 
-### Local CLI
+`route-sculptor-symbols` (one L4, scales to zero after 5 minutes idle) is deployed today in
+the `nyro-robotics` Modal workspace; the CPU website app is defined but not currently
+deployed, so the site runs locally only unless you deploy it yourself. Both the exact-match
+path and the model path were validated end to end — see
+[SYMBOL_EVALUATION.md](SYMBOL_EVALUATION.md) for measured pass rates, timings, and evidence,
+including a real browser run and a full sweep of every catalogue symbol against the live
+street graph.
+
+Two earlier approaches were tried: SD 1.5 / ControlNet silhouette generation, and a free-form LLM-drawn vector outline. Both drawing generation and routing lost important geometry; valid routes did not establish recognizable subjects. Their code and evidence are kept for
+reference (`outputs/legacy-diffusion-source/`, `src/outline_inference.py`,
+`scripts/modal_outlines.py`) — see [OUTLINE_EVALUATION.md](OUTLINE_EVALUATION.md) for what
+was tried and why it didn't clear the bar.
+
+## Routing-first research
+
+The catalogue’s 151/151 valid-route result does **not** establish recognition or requested pose fidelity. The separate generated-vector baseline compiled 11 of 120 outputs and produced zero qualifying routes. The experimental stroke router and 12-source approval workflow are documented in [ROUTING_MILESTONE.md](docs/ROUTING_MILESTONE.md). It supports open rides, internal strokes, visible connectors, upright placement, and 15/30/50/80 km limits on a separate SF–Palo Alto graph. Source approval and the controlled comparison are pending. See [PICKUP.md](PICKUP.md) for current state and [the historical index](docs/history/INDEX.md) for earlier evidence.
+
+## Validation
+
 ```bash
-PYTHONPATH=. python -m src.inference.cli --concept horse --preview
+GRADIO_ANALYTICS_ENABLED=False .venv/bin/python -m pytest -q
 ```
 
-## Output Structure
-```
-outputs/{concept}/
-    silhouette.png    # Generated image (binary black/white)
-    edges.png         # Canny edge detection
-    contour.png       # Extracted contour overlay (red=outer, blue=inner)
-    polyline.png      # Route shape
-    map_overlay.png   # Route on SF map tiles
-    route.gpx         # Rideable GPX file
-    metadata.json     # Placement details + stats
-```
+Tests cover coordinate alignment and rotation, directed/disconnected/curved/parallel-edge
+routing, symbol selection and caching (exact match, model fallback, unknown descriptions),
+street-search matching and placement, GPX round-trips, failure diagnostics, concurrency, and
+the Gradio wiring (queueing, isolated downloads, the `/about` route). Tests inject the model
+and search where useful and do not call Modal or require network access. For pass rates on
+the real model and the real street graph, see [SYMBOL_EVALUATION.md](SYMBOL_EVALUATION.md).
 
-## Architecture
+## Experimental text-to-vector milestone
 
-```
-src/pipeline/
-    image_gen.py        # SD 1.5 + binary post-processing + SVG loader
-    edge_detect.py      # Canny + ContourSet (outer + inner) + Otsu silhouette extraction
-    placement.py        # Grid search placement on SF map
-    waypoints.py        # Curvature-adaptive sampling + bridge-and-trace + densification
-    graph_routing.py    # Local OSM Dijkstra routing with backtrack penalty
-    routing.py          # Router factory (graph/valhalla/osrm)
-    gpx_utils.py        # GPX I/O
-src/evaluation/
-    clip_score.py       # CLIP text-image similarity
-    chamfer.py          # Chamfer distance
-    reward.py           # Combined reward function
-    render.py           # Route visualization
-src/training/
-    ddpo_trainer.py     # DDPO RL training (TRL)
-    reward_fn.py        # Pipeline-as-reward for DDPO
-    dataset.py          # Concept loading
-src/inference/
-    cli.py              # CLI interface
-    gradio_app.py       # Web UI
-```
-
-## Roadmap
-- [ ] **Road-snapping**: Snap contours to road grid before routing (eliminates zig-zags)
-- [ ] **ControlNet**: Condition SD on rendered SF street map for road-aware generation
-- [ ] **CLIP-only RL**: Train SD with DDPO using just CLIP score as reward
+The public site uses the SD 1.5 → raster outline → historical street-search pipeline. It retains
+failed images and diagnostics rather than replacing them with a catalogue icon. The generated-vector
+pipeline, catalogue selection, and stroke router remain experimental.

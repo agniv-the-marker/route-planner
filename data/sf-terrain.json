@@ -1,0 +1,62 @@
+{
+  "frame": "MapFrame(latitude=37.76, longitude=-122.45, width_m=10000.0, size=512)",
+  "resolution": 1024,
+  "zoom": 13,
+  "downloaded_at": "2026-09-05T02:54:57.540654+00:00",
+  "tiles": [
+    [
+      1308,
+      3165
+    ],
+    [
+      1309,
+      3165
+    ],
+    [
+      1310,
+      3165
+    ],
+    [
+      1308,
+      3166
+    ],
+    [
+      1309,
+      3166
+    ],
+    [
+      1310,
+      3166
+    ],
+    [
+      1308,
+      3167
+    ],
+    [
+      1309,
+      3167
+    ],
+    [
+      1310,
+      3167
+    ],
+    [
+      1308,
+      3168
+    ],
+    [
+      1309,
+      3168
+    ],
+    [
+      1310,
+      3168
+    ]
+  ],
+  "source": "https://s3.amazonaws.com/elevation-tiles-prod/terrarium",
+  "coast_source": "https://raw.githubusercontent.com/agniv-the-marker/ferryri.de/46e43796cc9f869723de921bd94d350795a217d0/public/data/coast.json",
+  "style_reference": "https://github.com/agniv-the-marker/ferryri.de",
+  "attribution": "Terrain: Mapzen / USGS / NOAA. Coast: MTC/ABAG (TIGER-derived).",
+  "sha256": "daa8c997890acdcb454804ec6bd547560f1165998cfc8423bca3c94f8d252e30",
+  "elevation_sha256": "bb1f12ca2c0fbbfb80723c63fb4425d7d1d1518a943a805976f4f4615dab7868"
+}

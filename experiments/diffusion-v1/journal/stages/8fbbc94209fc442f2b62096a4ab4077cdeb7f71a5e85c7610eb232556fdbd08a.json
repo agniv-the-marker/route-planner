@@ -1,0 +1,23 @@
+{
+  "key": "8fbbc94209fc442f2b62096a4ab4077cdeb7f71a5e85c7610eb232556fdbd08a",
+  "attempt": "heart",
+  "stage": "diffusion-inference",
+  "identity": {
+    "model": "stable-diffusion-v1-5/stable-diffusion-v1-5",
+    "revision": "main",
+    "prompt": "heart",
+    "seed": 74953647,
+    "steps": 30,
+    "guidance": 8.0,
+    "request_id": "heart"
+  },
+  "state": "completed",
+  "created": "2026-09-14T10:14:50.395087+00:00",
+  "remote": true,
+  "reservation": "diffusion-8fbbc94209fc442f2b62096a",
+  "started": "2026-09-14T10:14:50.893166+00:00",
+  "remote_job_id": "fc-01M2FPK4VS2VR37S9AVQFXDD17",
+  "artifact": "artifacts/8fbbc94209fc442f2b62096a4ab4077cdeb7f71a5e85c7610eb232556fdbd08a-9ac358fd690529f5e7a30981ba377f751864043e70de3176ab6257cd14f9df95.json",
+  "artifact_hash": "9ac358fd690529f5e7a30981ba377f751864043e70de3176ab6257cd14f9df95",
+  "ended": "2026-09-14T10:14:55.544553+00:00"
+}

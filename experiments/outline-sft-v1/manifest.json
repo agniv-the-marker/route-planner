@@ -1,0 +1,24 @@
+{
+  "version": "outline-sft-v1",
+  "catalogue_version": "mdi-7.4.47-outlines-v1",
+  "templates": [
+    "a {name}",
+    "a simple {name} silhouette",
+    "the outline of a {name}",
+    "a recognizable {name} icon"
+  ],
+  "system": "Draw the exact subject as one closed silhouette. Return only a JSON array of M/L/Q/C/Z commands with integer coordinates from 0 to 1024. Start with M and end with Z. Use one subpath, at most 32 commands, and preserve distinguishing features. Do not return prose or SVG.",
+  "examples": 604,
+  "subject_families": 151,
+  "held_out_families": [
+    "butterfly",
+    "cat",
+    "dinosaur",
+    "fish",
+    "heart",
+    "horse"
+  ],
+  "license": "Pictogrammers Free License / Apache-2.0 icon corpus",
+  "source_file_sha256": "e0008d0f59b13a991a35db5f9784a415cac9a89c11f5704e8af1ce1a1ba97b76",
+  "examples_sha256": "2ef0c75e6282d53cab7d974a26c2ac73d5110fc1b5ebb155bf859dd171756b36"
+}

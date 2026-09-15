@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Draw a Ride</title>
+  <link rel="icon" type="image/webp" href="/drawing-assets/bike-mark.webp">
+  <link rel="stylesheet" href="/drawing-assets/site.css">
+  <link rel="stylesheet" href="/drawing-assets/drawing.css">
+</head>
+<body>
+  <main class="site-shell draw-page">
+    {{HEADER}}
+    <section class="editor" data-editor="canvas" aria-label="Draw a ride">
+      <div class="canvas-toolbar">
+        <span class="drawing-label"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 16-1 5 5-1L21 7l-4-4Z M14 6l4 4"/></svg>draw a ride</span>
+        <div class="toolbar" aria-label="Canvas drawing tools">
+          <button type="button" data-action="undo">undo</button>
+          <button type="button" data-action="clear">clear</button>
+        </div>
+      </div>
+      <div class="canvas-wrap"><canvas id="draw-canvas" width="511" height="511" aria-label="Drawing canvas"></canvas></div>
+    </section>
+    <div class="run-controls"><button id="submit" type="button" class="submit">find a ride ↗</button></div>
+    <p id="status" class="status" role="status" aria-live="polite"></p>
+    <section id="results" class="results" hidden aria-label="Routes"><div id="route-list"></div></section>
+    <div id="map-template" hidden>{{MAP}}</div>
+    {{FOOTER}}
+  </main>
+  <script src="/drawing-assets/playback.js" defer></script>
+  <script src="/drawing-assets/drawing.js" defer></script>
+</body>
+</html>

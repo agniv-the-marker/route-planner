@@ -1,0 +1,25 @@
+{
+  "key": "4ad129c8075d5dad80691bd3dafec123c3ae035723953cd9cf8dd4d839b42efb",
+  "attempt": "heart",
+  "stage": "diffusion-inference",
+  "identity": {
+    "model": "Tongyi-MAI/Z-Image-Turbo",
+    "revision": "f332072aa78be7aecdf3ee76d5c247082da564a6",
+    "prompt": "heart",
+    "seed": 74953647,
+    "steps": 9,
+    "guidance": 0.0,
+    "request_id": "heart",
+    "template": "A crisp two-tone vector silhouette pictogram. Subject: {prompt}. Depict exactly this subject and its requested pose, with recognizable proportions and distinctive outer features. One complete solid jet-black cut-paper shape centered on a pure white square canvas. The subject occupies the central 70 percent of the canvas, with a wide empty white margin on every side. Keep the whole subject visible, including extremities. Use a clean, simple continuous outer boundary. Flat black fill throughout the subject; blank white outside. The image contains only the subject silhouette, without lettering, decorations, a frame, scenery, shadows, texture or a surrounding badge.",
+    "image_size": 1024
+  },
+  "state": "completed",
+  "created": "2026-09-14T14:06:04.360223+00:00",
+  "remote": true,
+  "reservation": "diffusion-4ad129c8075d5dad80691bd3",
+  "started": "2026-09-14T14:06:04.893716+00:00",
+  "remote_job_id": "fc-01M2G3THRA4P65VX6GQGJM6Z0D",
+  "artifact": "artifacts/4ad129c8075d5dad80691bd3dafec123c3ae035723953cd9cf8dd4d839b42efb-c6730faa3a0aa14cd3eb994ed49e5e7b699ef5cf95939a7e8d8134736c9941d5.json",
+  "artifact_hash": "c6730faa3a0aa14cd3eb994ed49e5e7b699ef5cf95939a7e8d8134736c9941d5",
+  "ended": "2026-09-14T14:06:11.421282+00:00"
+}

@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html><head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8"><meta charset="utf-8"><title>Source drawing approval</title><style>body{font:16px system-ui;max-width:1200px;margin:2rem auto}main{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:1rem}img{width:100%}article{border:1px solid #ddd;padding:1rem}</style><style type="text/css">.__react_component_tooltip {
+  border-radius: 3px;
+  display: inline-block;
+  font-size: 13px;
+  left: -999em;
+  opacity: 0;
+  padding: 8px 21px;
+  position: fixed;
+  pointer-events: none;
+  transition: opacity 0.3s ease-out;
+  top: -999em;
+  visibility: hidden;
+  z-index: 999;
+}
+.__react_component_tooltip.allow_hover, .__react_component_tooltip.allow_click {
+  pointer-events: auto;
+}
+.__react_component_tooltip::before, .__react_component_tooltip::after {
+  content: "";
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+.__react_component_tooltip.show {
+  opacity: 0.9;
+  margin-top: 0;
+  margin-left: 0;
+  visibility: visible;
+}
+.__react_component_tooltip.place-top::before {
+  border-left: 10px solid transparent;
+  border-right: 10px solid transparent;
+  bottom: -8px;
+  left: 50%;
+  margin-left: -10px;
+}
+.__react_component_tooltip.place-bottom::before {
+  border-left: 10px solid transparent;
+  border-right: 10px solid transparent;
+  top: -8px;
+  left: 50%;
+  margin-left: -10px;
+}
+.__react_component_tooltip.place-left::before {
+  border-top: 6px solid transparent;
+  border-bottom: 6px solid transparent;
+  right: -8px;
+  top: 50%;
+  margin-top: -5px;
+}
+.__react_component_tooltip.place-right::before {
+  border-top: 6px solid transparent;
+  border-bottom: 6px solid transparent;
+  left: -8px;
+  top: 50%;
+  margin-top: -5px;
+}
+.__react_component_tooltip .multi-line {
+  display: block;
+  padding: 2px 0;
+  text-align: center;
+}</style><style>/* Copyright 2014 Mozilla Foundation
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+.textLayer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  overflow: hidden;
+  opacity: 0.2;
+  line-height: 1;
+}
+
+.textLayer > span {
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+}
+
+.textLayer .highlight {
+  margin: -1px;
+  padding: 1px;
+  background-color: rgba(180, 0, 170, 1);
+  border-radius: 4px;
+}
+
+.textLayer .highlight.begin {
+  border-radius: 4px 0px 0px 4px;
+}
+
+.textLayer .highlight.end {
+  border-radius: 0px 4px 4px 0px;
+}
+
+.textLayer .highlight.middle {
+  border-radius: 0px;
+}
+
+.textLayer .highlight.selected {
+  background-color: rgba(0, 100, 0, 1);
+}
+
+.textLayer ::-moz-selection {
+  background: rgba(0, 0, 255, 1);
+}
+
+.textLayer ::selection {
+  background: rgba(0, 0, 255, 1);
+}
+
+.textLayer .endOfContent {
+  display: block;
+  position: absolute;
+  left: 0px;
+  top: 100%;
+  right: 0px;
+  bottom: 0px;
+  z-index: -1;
+  cursor: default;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+      -ms-user-select: none;
+          user-select: none;
+}
+
+.textLayer .endOfContent.active {
+  top: 0px;
+}
+
+
+.annotationLayer section {
+  position: absolute;
+}
+
+.annotationLayer .linkAnnotation > a,
+.annotationLayer .buttonWidgetAnnotation.pushButton > a {
+  position: absolute;
+  font-size: 1em;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.annotationLayer .linkAnnotation > a:hover,
+.annotationLayer .buttonWidgetAnnotation.pushButton > a:hover {
+  opacity: 0.2;
+  background: rgba(255, 255, 0, 1);
+  box-shadow: 0px 2px 10px rgba(255, 255, 0, 1);
+}
+
+.annotationLayer .textAnnotation img {
+  position: absolute;
+  cursor: pointer;
+}
+
+.annotationLayer .textWidgetAnnotation input,
+.annotationLayer .textWidgetAnnotation textarea,
+.annotationLayer .choiceWidgetAnnotation select,
+.annotationLayer .buttonWidgetAnnotation.checkBox input,
+.annotationLayer .buttonWidgetAnnotation.radioButton input {
+  background-color: rgba(0, 54, 255, 0.13);
+  border: 1px solid transparent;
+  box-sizing: border-box;
+  font-size: 9px;
+  height: 100%;
+  margin: 0;
+  padding: 0 3px;
+  vertical-align: top;
+  width: 100%;
+}
+
+.annotationLayer .choiceWidgetAnnotation select option {
+  padding: 0;
+}
+
+.annotationLayer .buttonWidgetAnnotation.radioButton input {
+  border-radius: 50%;
+}
+
+.annotationLayer .textWidgetAnnotation textarea {
+  font: message-box;
+  font-size: 9px;
+  resize: none;
+}
+
+.annotationLayer .textWidgetAnnotation input[disabled],
+.annotationLayer .textWidgetAnnotation textarea[disabled],
+.annotationLayer .choiceWidgetAnnotation select[disabled],
+.annotationLayer .buttonWidgetAnnotation.checkBox input[disabled],
+.annotationLayer .buttonWidgetAnnotation.radioButton input[disabled] {
+  background: none;
+  border: 1px solid transparent;
+  cursor: not-allowed;
+}
+
+.annotationLayer .textWidgetAnnotation input:hover,
+.annotationLayer .textWidgetAnnotation textarea:hover,
+.annotationLayer .choiceWidgetAnnotation select:hover,
+.annotationLayer .buttonWidgetAnnotation.checkBox input:hover,
+.annotationLayer .buttonWidgetAnnotation.radioButton input:hover {
+  border: 1px solid rgba(0, 0, 0, 1);
+}
+
+.annotationLayer .textWidgetAnnotation input:focus,
+.annotationLayer .textWidgetAnnotation textarea:focus,
+.annotationLayer .choiceWidgetAnnotation select:focus {
+  background: none;
+  border: 1px solid transparent;
+}
+
+.annotationLayer .buttonWidgetAnnotation.checkBox input:checked:before,
+.annotationLayer .buttonWidgetAnnotation.checkBox input:checked:after,
+.annotationLayer .buttonWidgetAnnotation.radioButton input:checked:before {
+  background-color: rgba(0, 0, 0, 1);
+  content: "";
+  display: block;
+  position: absolute;
+}
+
+.annotationLayer .buttonWidgetAnnotation.checkBox input:checked:before,
+.annotationLayer .buttonWidgetAnnotation.checkBox input:checked:after {
+  height: 80%;
+  left: 45%;
+  width: 1px;
+}
+
+.annotationLayer .buttonWidgetAnnotation.checkBox input:checked:before {
+  transform: rotate(45deg);
+}
+
+.annotationLayer .buttonWidgetAnnotation.checkBox input:checked:after {
+  transform: rotate(-45deg);
+}
+
+.annotationLayer .buttonWidgetAnnotation.radioButton input:checked:before {
+  border-radius: 50%;
+  height: 50%;
+  left: 30%;
+  top: 20%;
+  width: 50%;
+}
+
+.annotationLayer .textWidgetAnnotation input.comb {
+  font-family: monospace;
+  padding-left: 2px;
+  padding-right: 0;
+}
+
+.annotationLayer .textWidgetAnnotation input.comb:focus {
+  /*
+   * Letter spacing is placed on the right side of each character. Hence, the
+   * letter spacing of the last character may be placed outside the visible
+   * area, causing horizontal scrolling. We avoid this by extending the width
+   * when the element has focus and revert this when it loses focus.
+   */
+  width: 115%;
+}
+
+.annotationLayer .buttonWidgetAnnotation.checkBox input,
+.annotationLayer .buttonWidgetAnnotation.radioButton input {
+  -webkit-appearance: none;
+     -moz-appearance: none;
+          appearance: none;
+  padding: 0;
+}
+
+.annotationLayer .popupWrapper {
+  position: absolute;
+  width: 20em;
+}
+
+.annotationLayer .popup {
+  position: absolute;
+  z-index: 200;
+  max-width: 20em;
+  background-color: rgba(255, 255, 153, 1);
+  box-shadow: 0px 2px 5px rgba(136, 136, 136, 1);
+  border-radius: 2px;
+  padding: 6px;
+  margin-left: 5px;
+  cursor: pointer;
+  font: message-box;
+  font-size: 9px;
+  word-wrap: break-word;
+}
+
+.annotationLayer .popup > * {
+  font-size: 9px;
+}
+
+.annotationLayer .popup h1 {
+  display: inline-block;
+}
+
+.annotationLayer .popup span {
+  display: inline-block;
+  margin-left: 5px;
+}
+
+.annotationLayer .popup p {
+  border-top: 1px solid rgba(51, 51, 51, 1);
+  margin-top: 2px;
+  padding-top: 2px;
+}
+
+.annotationLayer .highlightAnnotation,
+.annotationLayer .underlineAnnotation,
+.annotationLayer .squigglyAnnotation,
+.annotationLayer .strikeoutAnnotation,
+.annotationLayer .freeTextAnnotation,
+.annotationLayer .lineAnnotation svg line,
+.annotationLayer .squareAnnotation svg rect,
+.annotationLayer .circleAnnotation svg ellipse,
+.annotationLayer .polylineAnnotation svg polyline,
+.annotationLayer .polygonAnnotation svg polygon,
+.annotationLayer .caretAnnotation,
+.annotationLayer .inkAnnotation svg polyline,
+.annotationLayer .stampAnnotation,
+.annotationLayer .fileAttachmentAnnotation {
+  cursor: pointer;
+}
+
+.pdfViewer .canvasWrapper {
+  overflow: hidden;
+}
+
+.pdfViewer .page {
+  direction: ltr;
+  width: 816px;
+  height: 1056px;
+  margin: 1px auto -8px auto;
+  position: relative;
+  overflow: visible;
+  border: 9px solid transparent;
+  background-clip: content-box;
+  -o-border-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABMAAAATCAYAAAByUDbMAAAA1ElEQVQ4jbWUWw6EIAxFy2NFs/8NzR4UJhpqLsdi5mOmSSMUOfYWqv3S0gMr4XlYH/64gZa/gN3ANYA7KAXALt4ktoQ5MI9YxqaG8bWmsIysMuT6piSQCa4whZThCu8CM4zP9YJaKci9jicPq3NcBWYoPMGUlhG7ivtkB+gVyFY75wXghOvh8t5mto1Mdim6e+MBqH6XsY+YAwjpq3vGF7weTWQptLEDVCZvPTMl5JZZsdh47FHW6qFMyvLYqjcnmdFfY9Xk/KDOlzCusX2mi/ofM7MPkzBcSp4Q1/wAAAAASUVORK5CYII=) 9 9 repeat;
+     border-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABMAAAATCAYAAAByUDbMAAAA1ElEQVQ4jbWUWw6EIAxFy2NFs/8NzR4UJhpqLsdi5mOmSSMUOfYWqv3S0gMr4XlYH/64gZa/gN3ANYA7KAXALt4ktoQ5MI9YxqaG8bWmsIysMuT6piSQCa4whZThCu8CM4zP9YJaKci9jicPq3NcBWYoPMGUlhG7ivtkB+gVyFY75wXghOvh8t5mto1Mdim6e+MBqH6XsY+YAwjpq3vGF7weTWQptLEDVCZvPTMl5JZZsdh47FHW6qFMyvLYqjcnmdFfY9Xk/KDOlzCusX2mi/ofM7MPkzBcSp4Q1/wAAAAASUVORK5CYII=) 9 9 repeat;
+  background-color: rgba(255, 255, 255, 1);
+}
+
+.pdfViewer.removePageBorders .page {
+  margin: 0px auto 10px auto;
+  border: none;
+}
+
+.pdfViewer.singlePageView {
+  display: inline-block;
+}
+
+.pdfViewer.singlePageView .page {
+  margin: 0;
+  border: none;
+}
+
+.pdfViewer.scrollHorizontal,
+.pdfViewer.scrollWrapped,
+.spread {
+  margin-left: 3.5px;
+  margin-right: 3.5px;
+  text-align: center;
+}
+
+.pdfViewer.scrollHorizontal,
+.spread {
+  white-space: nowrap;
+}
+
+.pdfViewer.removePageBorders,
+.pdfViewer.scrollHorizontal .spread,
+.pdfViewer.scrollWrapped .spread {
+  margin-left: 0;
+  margin-right: 0;
+}
+
+.spread .page,
+.pdfViewer.scrollHorizontal .page,
+.pdfViewer.scrollWrapped .page,
+.pdfViewer.scrollHorizontal .spread,
+.pdfViewer.scrollWrapped .spread {
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.spread .page,
+.pdfViewer.scrollHorizontal .page,
+.pdfViewer.scrollWrapped .page {
+  margin-left: -3.5px;
+  margin-right: -3.5px;
+}
+
+.pdfViewer.removePageBorders .spread .page,
+.pdfViewer.removePageBorders.scrollHorizontal .page,
+.pdfViewer.removePageBorders.scrollWrapped .page {
+  margin-left: 5px;
+  margin-right: 5px;
+}
+
+.pdfViewer .page canvas {
+  margin: 0;
+  display: block;
+}
+
+.pdfViewer .page canvas[hidden] {
+  display: none;
+}
+
+.pdfViewer .page .loadingIcon {
+  position: absolute;
+  display: block;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  background: url(data:image/gif;base64,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) center no-repeat;
+}
+
+.pdfPresentationMode .pdfViewer {
+  margin-left: 0;
+  margin-right: 0;
+}
+
+.pdfPresentationMode .pdfViewer .page,
+.pdfPresentationMode .pdfViewer .spread {
+  display: block;
+}
+
+.pdfPresentationMode .pdfViewer .page,
+.pdfPresentationMode .pdfViewer.removePageBorders .page {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.pdfPresentationMode:-ms-fullscreen .pdfViewer .page {
+  margin-bottom: 100% !important;
+}
+
+.pdfPresentationMode:-webkit-full-screen .pdfViewer .page {
+  margin-bottom: 100%;
+  border: 0;
+}
+
+.pdfPresentationMode:-moz-full-screen .pdfViewer .page {
+  margin-bottom: 100%;
+  border: 0;
+}
+
+.pdfPresentationMode:fullscreen .pdfViewer .page {
+  margin-bottom: 100%;
+  border: 0;
+}
+</style><style>/* overrides for pdf_viewer.css from PDF.JS web viewer */
+
+.textLayer {
+  z-index: 2;
+  opacity: 1;
+  mix-blend-mode: multiply;
+}
+
+.annotationLayer {
+  position: absolute;
+  top: 0;
+
+  z-index: 3;
+}
+
+html
+  body
+  .textLayer
+  > div:not(.PdfHighlighter__highlight-layer):not(.Highlight):not(.Highlight-emoji) {
+  opacity: 1;
+  mix-blend-mode: multiply;
+}
+
+.textLayer ::selection {
+  background: rgba(252, 232, 151, 1);
+  mix-blend-mode: multiply;
+}
+
+@media all and (-ms-high-contrast: none), (-ms-high-contrast: active) {
+  .textLayer {opacity: 0.5;}
+}
+
+/* Internet Explorer support method */
+@media all and (-ms-high-contrast: none), (-ms-high-contrast: active) {
+  .textLayer {opacity: 0.5 }
+}
+
+/* Microsoft Edge Browser 12+ (All) - @supports method */
+@supports (-ms-ime-align:auto) {
+  .textLayer {opacity: 0.5 }
+}
+</style><style>.PdfHighlighter {
+  position: absolute;
+  overflow: auto;
+  width: 100%;
+  height: 100%;
+}
+
+.PdfHighlighter__highlight-layer {
+  position: absolute;
+  z-index: 3;
+  left: 0;
+}
+
+.PdfHighlighter__tip-container {
+  z-index: 6;
+  position: absolute;
+}
+
+.PdfHighlighter--disable-selection {
+  user-select: none;
+  pointer-events: none;
+}
+</style><style>.MouseSelection {
+  position: absolute;
+  border: 1px dashed #333;
+  background: rgba(252, 232, 151, 1);
+  mix-blend-mode: multiply;
+}
+/* Internet Explorer support method */
+@media all and (-ms-high-contrast: none), (-ms-high-contrast: active) {
+  .MouseSelection {opacity: 0.5 }
+}
+
+/* Microsoft Edge Browser 12+ (All) - @supports method */
+@supports (-ms-ime-align:auto) {
+  .MouseSelection {opacity: 0.5 }
+}
+</style><style>.Tip__compact {
+  cursor: pointer;
+  background-color: #3d464d;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: white;
+  padding: 5px 10px;
+  border-radius: 3px;
+}
+
+.Tip__card {
+  padding: 10px;
+  background: #fff;
+  background-clip: padding-box;
+  border: 1px solid #e8e8e8;
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(37, 40, 43, 0.2);
+}
+
+.Tip__card textarea {
+  font-size: 16px;
+  width: 200px;
+  height: 70px;
+}
+
+.Tip__card input[type="submit"] {
+  margin-top: 5px;
+  font-size: large;
+}
+</style><style>.Highlight {
+  position: absolute;
+}
+
+.Highlight__emoji {
+  position: absolute;
+  color: black;
+  opacity: 1;
+  font-size: 28px;
+}
+
+.Highlight__parts {
+  opacity: 1;
+}
+
+.Highlight__part {
+  cursor: pointer;
+  position: absolute;
+  background: rgba(255, 226, 143, 1);
+  transition: background 0.3s;
+}
+
+.Highlight__popup {
+  background-color: #3d464d;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 3px;
+  max-width: 300px;
+  max-height: 100px;
+  overflow-y: scroll;
+}
+
+.Highlight--scrolledTo .Highlight__part {
+  background: #ff4141;
+}
+</style><style>.AreaHighlight {
+  border: 1px solid #333;
+  background-color: rgba(252, 232, 151, 1.0);
+  opacity: 1;
+  mix-blend-mode: multiply;
+}
+</style><style>.curius-sidebar {
+  overflow: auto;
+  color: rgb(119, 119, 119);
+  background: linear-gradient(
+    rgb(249, 248, 247),
+    rgb(251, 250, 248) 46px,
+    rgb(251, 251, 249) 120px,
+    rgb(248, 247, 245) 35%,
+    rgb(249, 248, 246)
+  );
+}
+
+.sidebar__highlights {
+  list-style: "none";
+  padding: 0;
+}
+
+.highlight__location {
+  margin-top: 0.5rem;
+  text-align: right;
+  font-size: 10px;
+}
+
+.highlight__image {
+  overflow: auto;
+  max-width: 300px;
+  border: 1px dashed;
+}
+
+.sidebar__selected {
+  background: rgba(58, 56, 52, 0.08);
+}
+
+.sidebar__highlight {
+  padding: 1rem;
+  cursor: pointer;
+  border-bottom: 1px solid rgb(119, 119, 119);
+}
+
+.sidebar__highlight:hover {
+  background: rgba(58, 56, 52, 0.08);
+}
+.curius-blockquote {
+  font-size: 14px;
+  padding: 0;
+  margin: 0;
+  quotes: "\201c" "\201d";
+}
+.curius-blockquote:before {
+  content: open-quote;
+}
+.curius-blockquote:after {
+  content: close-quote;
+}</style><style>.cropper-view-box, .cropper-face {
+  border-radius: 50%;
+}
+
+
+
+/* styles for both web app and extension
+DO NOT put body styles or generic class names here!
+it will screw with webpages since this is imported into
+every web page for the extension */</style><style>@import url(https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,700;1,400&family=IBM+Plex+Mono&family=Lora:wght@400;600&family=Nunito&family=Public+Sans:wght@300&family=Source+Sans+Pro:wght@400;600;700&display=swap);</style><style>body {
+  --block-text-color: black;
+  --block-background-color: #fff;
+  --block-accent-color: #00ae86;
+  --block-shadow-color: black;
+}
+
+/* BASIC BLOCK STYLES */
+.curiusblock {
+  display: block;
+  color: var(--block-text-color);
+  border: 1px solid var(--block-text-color);
+  border-radius: 3px;
+  padding: 4px 8px;
+  background: var(--block-background-color);
+  font-weight: bold;
+  cursor: pointer;
+  box-sizing: border-box;
+
+  position: relative;
+  top: -2px;
+  left: -2px;
+  transition: transform 0.1s;
+  margin: 10px 3px 10px 3px;
+  z-index: 1;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+}
+.curiusactive {
+  position: fixed;
+}
+.curiusactive::before{
+  content: "";
+  position: absolute;
+  height: 4px;
+  width: 25px;
+  left: 2px;
+  z-index: -1;
+  background-color: #ffc107;
+}
+.curiusblock.curius::before {
+    content: "";
+    background: #97de8b;
+    /* padding: 5px 10px; */
+    font-size: 14px;
+    border: 1px solid var(--block-text-color);
+    border-radius: 3px;
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    height: 100%;
+    width: 100%;
+    z-index: -1;
+}
+
+.curius-message {
+    position: absolute;
+    display: none;
+    background-color: #eee;
+    color: grey;
+    padding: 5px 10px;
+    font-size: 10pt;
+}
+.curius-message.shown {
+    display: block;
+}
+
+
+.curiusblock.curiuswrapper,
+.curiusblock.curiuswrapper.inline {
+  display: inline-block;
+  padding: 0;
+}
+
+.curiusblock.curiuswrapper > * {
+  margin: 0;
+}
+
+/* INTERACTIVE BLOCK STYLES */
+/* .curiusblock::before {
+  content: "";
+  background: var(--block-background-color);
+  border: 2px solid var(--block-text-color);
+  border-radius: 3px;
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  height: 100%;
+  width: 100%;
+  z-index: -1;
+} */
+
+.curiusblock:hover,
+.curiusblock:focus {
+  transform: translate(2px, 2px);
+}
+
+.curiusblock::after {
+  content: "";
+  display: block;
+  background: var(--block-shadow-color);
+  border: 1px solid var(--block-text-color);
+  border-radius: 3px;
+  height: 100%;
+  width: 100%;
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  right: 0;
+  z-index: -2;
+  transition: transform 0.1s;
+  box-sizing: revert;
+  -webkit-box-sizing: revert;
+}
+
+.curiusblock:hover::after,
+.curiusblock:focus::after {
+  transform: translate(-2px, -3px);
+}
+
+.curiusblock:active {
+  color: var(--block-text-color);
+  /* transform: translate(3px, 3px); */
+}
+
+ .curiusblock:active::after {
+  /* transform: translate(-3px, -3px); */
+} 
+
+.curiusblock:focus {
+  outline: none;
+}
+
+.curiusblock.fixed {
+  cursor: initial;
+}
+
+/* FIXED STYLES */
+.curiusblock.fixed:hover,
+.curiusblock.fixed:hover::before,
+.curiusblock.fixed:hover::after,
+.curiusblock.fixed:active,
+.curiusblock.fixed:active::before,
+.curiusblock.fixed:active::after,
+.curiusblock.fixed:focus,
+.curiusblock.fixed:focus::before,
+.curiusblock.fixed:focus::after {
+  transform: none;
+}
+
+/* ACCENT STYLES */
+.curiusblock.accent {
+  color: var(--block-background-color);
+  background: var(--block-accent-color);
+}
+
+.curiusblock.accent::before {
+  background: var(--block-accent-color);
+}
+
+/* INLINE STYLES */
+.curiusblock.inline {
+  display: inline-block;
+  font-size: 0.75em;
+  padding: 0 6px;
+  margin: 3px 2px 1px 4px;
+}
+.curiusblock.inline::after {
+  top: -1px;
+  left: -1px;
+}
+.curiusblock.inline:hover,
+.curiusblock.inline:focus {
+  transform: translate(1px, 1px);
+}
+.curiusblock.inline:hover::after,
+.curiusblock.inline:focus::after {
+  transform: translate(-1px, -1px);
+}
+.curiusblock.inline:active {
+  transform: translate(2px, 2px);
+}
+
+/* ROUND STYLES */
+.curiusblock.curiusround,
+.curiusblock.curiusround::before,
+.curiusblock.curiusround::after {
+  border-radius: 30px;
+}
+
+.curiusblock.curiusround::after {
+  left: 1px;
+}
+
+.curiushalo {
+  border-radius: 100%;
+  /* background-color: #eee; */
+  width: 40px;
+  height: 40px;
+  top: 2px;
+  left: -5px;
+  overflow: hidden;
+  position: absolute;
+  z-index: -1;
+}
+.curius-tooltip {
+    /* border-color: grey !important; */
+    /* background-color: #eee !important; */
+    padding: 5px;
+    max-width: 200px;
+}
+
+@keyframes curius-spin {
+  100% {
+    -webkit-transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+.curius-gradient {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 200%;
+  height: 200%;
+  transform: translate(-50%, -50%);
+  /* background: linear-gradient(45deg, #97de8b, #fff, #97de8b); */
+  /* background: linear-gradient(45deg, red, orange, yellow, green, blue, indigo, violet); */
+  /* background: linear-gradient(45deg, rgb(248 248 248 / 68%), rgb(194 194 194 / 61%), rgb(248 248 248 / 68%), rgb(194 194 194 / 61%));  */
+  background: linear-gradient(45deg, rgb(255 246 223), rgb(255 209 95), #fff6a6, rgb(255 214 134));
+  animation: curius-spin 5s linear infinite;
+}</style></head><body><h1>12 proposed source drawings</h1><p>Inspect 
+plain drawings first, then reveal the subject. These sources need your 
+acceptance before routing. IDs 01–04 tune parameters; 05–12 form the 
+comparison set. Connector drawings show the entire proposed ride.</p><main><article><h2>01</h2><img src="Source%20drawing%20approval_files/01-source.svg"><details><summary>Reveal subject and details</summary><p>heart: two lobes and central notch</p><p>tuning; proposed continuous traversal, including connectors:</p><img src="Source%20drawing%20approval_files/01-continuous.svg"></details><div><label>Your guess before reveal <input class="guess"></label><label>Source drawing <select><option>unreviewed</option><option selected="selected">pass</option><option>fail</option><option>uncertain</option></select></label><label>Feature notes <textarea></textarea></label><button>Save review</button><span aria-live="polite"> Saved</span></div></article><article><h2>02</h2><img src="Source%20drawing%20approval_files/02-source.svg"><details><summary>Reveal subject and details</summary><p>house with a door: roof peak, door</p><p>tuning; proposed continuous traversal, including connectors:</p><img src="Source%20drawing%20approval_files/02-continuous.svg"></details><div><label>Your guess before reveal <input class="guess"></label><label>Source drawing <select><option>unreviewed</option><option>pass</option><option selected="selected">fail</option><option>uncertain</option></select></label><label>Feature notes <textarea>the door and house are already connected so the extra connection is bad</textarea></label><button>Save review</button><span aria-live="polite"> Saved</span></div></article><article><h2>03</h2><img src="Source%20drawing%20approval_files/03-source.svg"><details><summary>Reveal subject and details</summary><p>bicycle: two wheels, triangular frame, handlebar</p><p>tuning; proposed continuous traversal, including connectors:</p><img src="Source%20drawing%20approval_files/03-continuous.svg"></details><div><label>Your guess before reveal <input class="guess"></label><label>Source drawing <select><option>unreviewed</option><option>pass</option><option selected="selected">fail</option><option>uncertain</option></select></label><label>Feature notes <textarea>again the bike and wheels are connected but also this bike is too horizontally compressed</textarea></label><button>Save review</button><span aria-live="polite"> Saved</span></div></article><article><h2>04</h2><img src="Source%20drawing%20approval_files/04-source.svg"><details><summary>Reveal subject and details</summary><p>running person: head, bent arms, striding legs</p><p>tuning; proposed continuous traversal, including connectors:</p><img src="Source%20drawing%20approval_files/04-continuous.svg"></details><div><label>Your guess before reveal <input class="guess"></label><label>Source drawing <select><option>unreviewed</option><option>pass</option><option selected="selected">fail</option><option>uncertain</option></select></label><label>Feature notes <textarea>this doesnt use backtracking which is bad because with backtracking it would be good</textarea></label><button>Save review</button><span aria-live="polite"> Saved</span></div></article><article><h2>05</h2><img src="Source%20drawing%20approval_files/05-source.svg"><details><summary>Reveal subject and details</summary><p>star: five sharp points</p><p>comparison; proposed continuous traversal, including connectors:</p><img src="Source%20drawing%20approval_files/05-continuous.svg"></details><div><label>Your guess before reveal <input class="guess"></label><label>Source drawing <select><option>unreviewed</option><option selected="selected">pass</option><option>fail</option><option>uncertain</option></select></label><label>Feature notes <textarea></textarea></label><button>Save review</button><span aria-live="polite"> Saved</span></div></article><article><h2>06</h2><img src="Source%20drawing%20approval_files/06-source.svg"><details><summary>Reveal subject and details</summary><p>fish: broad tail</p><p>comparison; proposed continuous traversal, including connectors:</p><img src="Source%20drawing%20approval_files/06-continuous.svg"></details><div><label>Your guess before reveal <input class="guess"></label><label>Source drawing <select><option>unreviewed</option><option selected="selected">pass</option><option>fail</option><option>uncertain</option></select></label><label>Feature notes <textarea></textarea></label><button>Save review</button><span aria-live="polite"> Saved</span></div></article><article><h2>07</h2><img src="Source%20drawing%20approval_files/07-source.svg"><details><summary>Reveal subject and details</summary><p>cat: pointed ears and sitting body</p><p>comparison; proposed continuous traversal, including connectors:</p><img src="Source%20drawing%20approval_files/07-continuous.svg"></details><div><label>Your guess before reveal <input class="guess"></label><label>Source drawing <select><option>unreviewed</option><option selected="selected">pass</option><option>fail</option><option>uncertain</option></select></label><label>Feature notes <textarea></textarea></label><button>Save review</button><span aria-live="polite"> Saved</span></div></article><article><h2>08</h2><img src="Source%20drawing%20approval_files/08-source.svg"><details><summary>Reveal subject and details</summary><p>sailboat: triangular sails, hull</p><p>comparison; proposed continuous traversal, including connectors:</p><img src="Source%20drawing%20approval_files/08-continuous.svg"></details><div><label>Your guess before reveal <input class="guess"></label><label>Source drawing <select><option>unreviewed</option><option>pass</option><option>fail</option><option selected="selected">uncertain</option></select></label><label>Feature notes <textarea>uh i think this couldve been done better if you extended the bottom of the triangles to each other</textarea></label><button>Save review</button><span aria-live="polite"> Saved</span></div></article><article><h2>09</h2><img src="Source%20drawing%20approval_files/09-source.svg"><details><summary>Reveal subject and details</summary><p>umbrella with curved handle: canopy, hooked handle</p><p>comparison; proposed continuous traversal, including connectors:</p><img src="Source%20drawing%20approval_files/09-continuous.svg"></details><div><label>Your guess before reveal <input class="guess"></label><label>Source drawing <select><option>unreviewed</option><option>pass</option><option selected="selected">fail</option><option>uncertain</option></select></label><label>Feature notes <textarea>this is all connected already so it didnt need to draw an extra line</textarea></label><button>Save review</button><span aria-live="polite"> Saved</span></div></article><article><h2>10</h2><img src="Source%20drawing%20approval_files/10-source.svg"><details><summary>Reveal subject and details</summary><p>butterfly: four wings, antennae</p><p>comparison; proposed continuous traversal, including connectors:</p><img src="Source%20drawing%20approval_files/10-continuous.svg"></details><div><label>Your guess before reveal <input class="guess"></label><label>Source drawing <select><option>unreviewed</option><option selected="selected">pass</option><option>fail</option><option>uncertain</option></select></label><label>Feature notes <textarea></textarea></label><button>Save review</button><span aria-live="polite"> Saved</span></div></article><article><h2>11</h2><img src="Source%20drawing%20approval_files/11-source.svg"><details><summary>Reveal subject and details</summary><p>flower with two leaves: petals, stem, two leaves</p><p>comparison; proposed continuous traversal, including connectors:</p><img src="Source%20drawing%20approval_files/11-continuous.svg"></details><div><label>Your guess before reveal <input class="guess"></label><label>Source drawing <select><option>unreviewed</option><option>pass</option><option selected="selected">fail</option><option>uncertain</option></select></label><label>Feature notes <textarea>the stem couldve touched the flower</textarea></label><button>Save review</button><span aria-live="polite"> Saved</span></div></article><article><h2>12</h2><img src="Source%20drawing%20approval_files/12-source.svg"><details><summary>Reveal subject and details</summary><p>two mountains and sun: two distinct peaks, separate sun</p><p>comparison; proposed continuous traversal, including connectors:</p><img src="Source%20drawing%20approval_files/12-continuous.svg"></details><div><label>Your guess before reveal <input class="guess"></label><label>Source drawing <select><option>unreviewed</option><option>pass</option><option selected="selected">fail</option><option>uncertain</option></select></label><label>Feature notes <textarea>the mountain peak coudlve touched the sun</textarea></label><button>Save review</button><span aria-live="polite"> Saved</span></div></article></main><style>label{display:block;margin:.6rem 0}input,textarea,select,button{font:inherit;max-width:100%;padding:.4rem}#status{position:sticky;top:0;background:white;padding:1rem}</style><p id="status">Reviews
+ are saved on this preview. Inspect each plain drawing, enter a guess, 
+then reveal its subject. Acceptance is confirmed separately in the 
+conversation.</p><script>
+(async()=>{const saved=await (await fetch('/api/reviews')).json();
+for(const article of document.querySelectorAll('article')){
+const id=article.querySelector('h2').textContent.trim(), previous=saved[id]||{};
+const form=document.createElement('div');form.innerHTML='<label>Your guess before reveal <input class="guess"></label><label>Source drawing <select><option>unreviewed</option><option>pass</option><option>fail</option><option>uncertain</option></select></label><label>Feature notes <textarea></textarea></label><button>Save review</button><span aria-live="polite"></span>';
+article.append(form);form.querySelector('input').value=previous.guess||'';form.querySelector('textarea').value=previous.details||'';form.querySelector('select').value=previous.label||'unreviewed';
+let revealed=previous.revealed||false;article.querySelector('details').addEventListener('toggle',()=>{revealed=true});
+form.querySelector('button').onclick=async()=>{const response=await fetch('/api/reviews/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({label:form.querySelector('select').value,guess:form.querySelector('input').value,details:form.querySelector('textarea').value,revealed})});form.querySelector('span').textContent=response.ok?' Saved':' Save failed';};}
+})();</script><div class="selection_bubble" id="curr"></div><div id="curius-container"></div></body></html>

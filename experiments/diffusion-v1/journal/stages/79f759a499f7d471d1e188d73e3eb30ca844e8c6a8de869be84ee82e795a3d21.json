@@ -1,0 +1,23 @@
+{
+  "key": "79f759a499f7d471d1e188d73e3eb30ca844e8c6a8de869be84ee82e795a3d21",
+  "attempt": "fish",
+  "stage": "diffusion-inference",
+  "identity": {
+    "model": "stable-diffusion-v1-5/stable-diffusion-v1-5",
+    "revision": "main",
+    "prompt": "fish",
+    "seed": 310422696,
+    "steps": 30,
+    "guidance": 8.0,
+    "request_id": "fish"
+  },
+  "state": "completed",
+  "created": "2026-09-14T10:12:52.228393+00:00",
+  "remote": true,
+  "reservation": "diffusion-79f759a499f7d471d1e188d7",
+  "started": "2026-09-14T10:12:53.094369+00:00",
+  "remote_job_id": "fc-01M2FPFHVNFRX1JHXY9R0SKR28",
+  "artifact": "artifacts/79f759a499f7d471d1e188d73e3eb30ca844e8c6a8de869be84ee82e795a3d21-efab518b3cb7fc6fcc134583509112c45f21198193895d4b07cb1d8566c19622.json",
+  "artifact_hash": "efab518b3cb7fc6fcc134583509112c45f21198193895d4b07cb1d8566c19622",
+  "ended": "2026-09-14T10:13:44.773226+00:00"
+}

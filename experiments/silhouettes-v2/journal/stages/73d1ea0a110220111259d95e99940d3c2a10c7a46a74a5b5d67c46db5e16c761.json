@@ -1,0 +1,25 @@
+{
+  "key": "73d1ea0a110220111259d95e99940d3c2a10c7a46a74a5b5d67c46db5e16c761",
+  "attempt": "a mythical phoenix",
+  "stage": "diffusion-inference",
+  "identity": {
+    "model": "Tongyi-MAI/Z-Image-Turbo",
+    "revision": "f332072aa78be7aecdf3ee76d5c247082da564a6",
+    "prompt": "a mythical phoenix",
+    "seed": 2601353329,
+    "steps": 9,
+    "guidance": 0.0,
+    "request_id": "a mythical phoenix",
+    "template": "A crisp two-tone vector silhouette pictogram. Subject: {prompt}. Depict exactly this subject and its requested pose, with recognizable proportions and distinctive outer features. One complete solid jet-black cut-paper shape centered on a pure white square canvas. The subject occupies the central 70 percent of the canvas, with a wide empty white margin on every side. Keep the whole subject visible, including extremities. Use a clean, simple continuous outer boundary. Flat black fill throughout the subject; blank white outside. The image contains only the subject silhouette, without lettering, decorations, a frame, scenery, shadows, texture or a surrounding badge.",
+    "image_size": 1024
+  },
+  "state": "completed",
+  "created": "2026-09-14T14:49:17.926336+00:00",
+  "remote": true,
+  "reservation": "diffusion-73d1ea0a110220111259d95e",
+  "started": "2026-09-14T14:49:18.436791+00:00",
+  "remote_job_id": "fc-01M2G69PFGQZCWD2NCCN7Z98ZS",
+  "artifact": "artifacts/73d1ea0a110220111259d95e99940d3c2a10c7a46a74a5b5d67c46db5e16c761-6a378a761b24c44ec06754a19f63840d7c6fb4f663629176e42ff65566a0b672.json",
+  "artifact_hash": "6a378a761b24c44ec06754a19f63840d7c6fb4f663629176e42ff65566a0b672",
+  "ended": "2026-09-14T14:49:25.010762+00:00"
+}

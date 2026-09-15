@@ -1,0 +1,23 @@
+{
+  "key": "929e06929a9bbbfb29b65bfa5f217f4780181e1b344e7fe0f9fc70b72298c40f",
+  "attempt": "horse",
+  "stage": "diffusion-inference",
+  "identity": {
+    "model": "stable-diffusion-v1-5/stable-diffusion-v1-5",
+    "revision": "main",
+    "prompt": "horse",
+    "seed": 3789663528,
+    "steps": 30,
+    "guidance": 8.0,
+    "request_id": "horse"
+  },
+  "state": "completed",
+  "created": "2026-09-14T10:16:29.957290+00:00",
+  "remote": true,
+  "reservation": "diffusion-929e06929a9bbbfb29b65bfa",
+  "started": "2026-09-14T10:16:30.489608+00:00",
+  "remote_job_id": "fc-01M2FPP66EY1E9MSTGVAZA9P9G",
+  "artifact": "artifacts/929e06929a9bbbfb29b65bfa5f217f4780181e1b344e7fe0f9fc70b72298c40f-ba544f76934cc52f09ee5b92b210664835f243234ebdfb5c0f717b8de276a062.json",
+  "artifact_hash": "ba544f76934cc52f09ee5b92b210664835f243234ebdfb5c0f717b8de276a062",
+  "ended": "2026-09-14T10:16:35.135643+00:00"
+}
