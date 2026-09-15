@@ -141,9 +141,9 @@ def markup(route=None, outline=None, frame=SF, graph=None, label='san francisco'
         <path class="ride" d="{route_path}" fill="none" stroke="var(--route-color, #637baa)" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
         {start}
       </svg>
-      <div class="map-bottom">{'<button type="button" class="route-play" aria-label="Play route direction">▶</button>' if route is not None else ''}<div class="map-actions">{gpx_action}{another_action}</div><div>
+      <div class="map-bottom">{'<button type="button" class="route-play" aria-label="Play route direction">▶</button>' if route is not None else ''}<div class="map-actions">{gpx_action}</div><div>
         <button type="button" data-map="in" aria-label="Zoom in">+</button>
         <button type="button" data-map="out" aria-label="Zoom out">−</button>
         <button type="button" data-map="reset" aria-label="Reset map">reset</button>
       </div></div>
-    </div>{profile_markup(route)}'''
+    </div>{profile_markup(route)}{f'<div class="map-toolbar">{another_action}</div>' if another_action else ''}'''

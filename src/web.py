@@ -67,7 +67,7 @@ def create_app(service=None):
         with gr.Row(elem_id="prompt-bar"):
             prompt = gr.Textbox(label="Describe a shape", show_label=False, placeholder="A heart, a fish, a butterfly…", max_length=200,
                                 lines=1, scale=4, min_width=180, elem_id="prompt-box")
-            button = gr.Button("generate silhouettes ↗", variant="primary", scale=1,
+            button = gr.Button("generate silhouettes\u00a0↗", variant="primary", scale=1,
                                min_width=120, elem_id="generate-button")
         status = gr.Markdown("", elem_id="status")
         outline_choices = gr.Gallery(label="choose the outline to fit", columns=4, height=220,

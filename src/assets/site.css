@@ -67,15 +67,21 @@ button.is-busy::after { content:"🚲"; display:inline-block; position:relative;
 .map-eyebrow, .map-bottom { display: flex; align-items: center; justify-content: space-between; gap: 8px;
   font: var(--mono-md) var(--mono); color: #667260; padding: 8px 12px; }
 .map-eyebrow { border-bottom: 1px solid #dde0d8; }
+/* "another route" is a full-width bar closing the map/elevation box. It used to sit in
+   the bottom control row, which overflowed at phone widths. */
+.map-toolbar { display: flex; }
+.map-toolbar .map-action { flex: 1; min-height: 44px; padding: 12px;
+  border: 1px solid #d7dad2; border-top: 0; }
 .map-bottom { border-top: 1px solid #dde0d8; }
 .map-bottom > div { display: flex; flex-shrink: 0; gap: 4px; }
 /* Download GPX is an <a download> for real, but it belongs in the control row, so it
    wears the same chrome as the zoom buttons beside it. */
 .map-bottom button, .map-bottom .map-action { background: transparent; border: 1px solid #c8cfc2; padding: 8px 12px; font: inherit;
   color: #667260; cursor: pointer; min-width: 36px; min-height: 36px; }
-.map-bottom .map-action { display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box;
+.map-bottom .map-action, .map-toolbar .map-action { background: transparent; color: #667260;
+  font: var(--mono-md) var(--mono); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box;
   text-decoration: none; white-space: nowrap; }
-.map-bottom button:hover, .map-bottom .map-action:hover { border-color: var(--route-color); color: var(--route-color); }
+.map-bottom button:hover, .map-bottom .map-action:hover, .map-toolbar .map-action:hover { border-color: var(--route-color); color: var(--route-color); }
 .streets { opacity: var(--street-opacity); display: var(--street-display); }
 .reference-outline { display: var(--outline-display); }
 .neighborhoods { font: 7.5px var(--mono); fill: #818c7e; text-anchor: middle; pointer-events: none; }
@@ -116,7 +122,9 @@ footer:not(#credits) { display: none !important; }
   #prompt-bar { flex-wrap: nowrap !important; }
   #prompt-box { min-width: 0 !important; }
   #prompt-box textarea { font-size: 18px; white-space: nowrap; overflow: hidden; }
-  #generate-button { min-width: 108px !important; font-size: var(--mono-md); }
+  /* Too narrow for one line: let the label wrap instead of clipping it. */
+  #generate-button { min-width: 108px !important; font-size: var(--mono-md);
+    white-space: normal; line-height: 1.35; padding: 8px 10px !important; }
   /* Too narrow for the busy label; the spinning bike carries the state on its own. */
   #generate-button.is-busy::before { display: none; }
   #generate-button.is-busy::after { margin-left: 0; }
