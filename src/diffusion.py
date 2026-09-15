@@ -52,10 +52,11 @@ class DiffusionGenerator:
     """Four independent silhouettes. ``remote`` is injectable for tests."""
     def __init__(self, remote=None, cache_dir='route_cache/silhouettes-v2',
                  journal_dir='experiments/silhouettes-v2/journal',
-                 budget_path='experiments/budget.json'):
+                 budget_path='experiments/budget.json', persist=None):
         self.remote, self.cache_dir = remote, Path(cache_dir)
         self.journal = Journal(journal_dir)
         self.budget = Budget(budget_path)
+        self.persist = persist or (lambda: None)
 
     def _remote_stage(self, prompt, seed, request_id):
         identity = {'model': MODEL, 'revision': REVISION, 'prompt': normalize_prompt(prompt),
@@ -72,6 +73,7 @@ class DiffusionGenerator:
             row.update(state='running', remote=True, remote_job_id=job_id,
                        reservation=reservation, started=row.get('started', now()))
             atomic_json(path, row)
+        self.persist()
 
     def _finish_remote_stage(self, path, value):
         artifact = f'artifacts/{path.stem}-{digest(value)}.json'
@@ -134,6 +136,8 @@ class DiffusionGenerator:
                 row = json.loads(path.read_text())
                 row.update(state='running', remote=True, reservation=reservation, started=row.get('started', now()))
                 atomic_json(path, row)
+            # Persist reservation and uncertain-dispatch marker before paid work.
+            self.persist()
             call = worker.generate.spawn(prompt, seed)
             job_id = getattr(call, 'object_id', None) or getattr(call, 'id', None)
             if not job_id:
@@ -195,6 +199,7 @@ class DiffusionGenerator:
                         'steps': STEPS, 'guidance': GUIDANCE, 'image_size': IMAGE_SIZE,
                         'remote_job_id': candidate.remote_job_id}))
                     os.replace(name, meta)
+                    self.persist()
             except Exception as exc:
                 candidate.error = str(exc)
             candidate.timings['generation_seconds'] = round(time.perf_counter() - started, 3)

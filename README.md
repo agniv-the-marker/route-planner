@@ -1,5 +1,8 @@
 # Route Sculptor
 
+Public site: [agniv.me/route-planner](https://agniv.me/route-planner/).
+See [hosting and monthly budget](docs/HOSTING.md) for the Modal deployment, persistence, and credentials.
+
 Describe a shape and Route Sculptor generates four Stable Diffusion silhouettes, extracts a
 validated outer contour, and searches for a matching SF bicycle-street loop.
 then searches for it as a closed bicycle street loop in San Francisco. The site shows the

@@ -102,3 +102,38 @@ def test_modal_dispatch_is_reconciled_without_spawning_again(tmp_path, monkeypat
     assert candidate.remote_job_id == call.object_id
     assert len(calls) == 1
     assert len(json.loads(budget.read_text())['allocations']) == 1
+
+
+def test_persisted_cache_is_complete_before_yield(tmp_path):
+    snapshots = []
+    def persist():
+        metadata = list(tmp_path.glob('*.json'))
+        assert all(path.with_suffix('.png').exists() for path in metadata)
+        snapshots.append(len(metadata))
+    generator = DiffusionGenerator(lambda prompt, seed: {'image': _png()},
+                                   tmp_path, persist=persist)
+    assert all(not c.error for c in generator.candidates('heart'))
+    assert snapshots == [1, 2, 3, 4]
+    assert all(c.cached for c in generator.candidates('heart'))
+    assert snapshots == [1, 2, 3, 4]
+
+
+def test_failed_persistence_prevents_paid_dispatch(tmp_path, monkeypatch):
+    calls = []
+    class Generate:
+        def spawn(self, *args):
+            calls.append(args)
+            raise AssertionError('Must persist before dispatch')
+    monkeypatch.setitem(sys.modules, 'modal', types.SimpleNamespace(
+        is_local=lambda: False,
+        Cls=types.SimpleNamespace(from_name=lambda *a, **kw: lambda: types.SimpleNamespace(generate=Generate()))))
+    def persist():
+        row = json.loads(next((tmp_path / 'journal/stages').glob('*.json')).read_text())
+        assert row['state'] == 'running' and row['reservation']
+        assert json.loads((tmp_path / 'budget.json').read_text())['allocations']
+        raise RuntimeError('Storage unavailable')
+    generator = DiffusionGenerator(cache_dir=tmp_path / 'cache',
+        journal_dir=tmp_path / 'journal', budget_path=tmp_path / 'budget.json', persist=persist)
+    result = next(generator.candidates('fish'))
+    assert result.error == 'Storage unavailable'
+    assert calls == []
