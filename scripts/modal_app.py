@@ -37,8 +37,9 @@ def web():
     @site.middleware('http')
     async def embedding_policy(request, call_next):
         response = await call_next(request)
-        response.headers['Content-Security-Policy'] = (
-            "frame-ancestors 'self' https://agniv.me http://127.0.0.1:* http://localhost:*")
+        # routesculptor.bike reaches this app through its own Cloudflare Worker rather
+        # than an iframe, so nothing but the site itself needs to frame these pages.
+        response.headers['Content-Security-Policy'] = "frame-ancestors 'self'"
         return response
 
     return site

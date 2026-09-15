@@ -1,6 +1,6 @@
 # Route Sculptor
 
-Public site: [agniv.me/route-planner](https://agniv.me/route-planner/).
+Public site: [routesculptor.bike](https://routesculptor.bike/).
 See [hosting and monthly budget](docs/HOSTING.md) for the Modal deployment, persistence, and credentials.
 
 Describe a shape and Route Sculptor generates four Stable Diffusion silhouettes, extracts a
@@ -92,7 +92,7 @@ MODAL_PROFILE=nyro-robotics modal deploy scripts/modal_app.py       # the CPU we
 
 `route-sculptor-symbols` (one L4, scales to zero after 5 minutes idle) is deployed today in
 the `nyro-robotics` Modal workspace. The CPU website is now deployed at
-[agniv.me/route-planner](https://agniv.me/route-planner/) with the current diffusion
+[routesculptor.bike](https://routesculptor.bike/) with the current diffusion
 pipeline and drawing mode; see [HOSTING.md](docs/HOSTING.md). Both the exact-match
 path and the model path were validated end to end — see
 [SYMBOL_EVALUATION.md](SYMBOL_EVALUATION.md) for measured pass rates, timings, and evidence,

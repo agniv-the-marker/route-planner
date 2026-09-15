@@ -83,6 +83,15 @@ def link_preview(base_url: str) -> str:
     ))
 
 
+def public_base_url(request) -> str:
+    """The address the browser used, which is the proxy's host when one sits in front."""
+    forwarded = request.headers.get('x-forwarded-host')
+    if not forwarded:
+        return str(request.base_url)
+    scheme = request.headers.get('x-forwarded-proto') or request.url.scheme
+    return f"{scheme.split(',')[0].strip()}://{forwarded.split(',')[0].strip()}/"
+
+
 def boot_document(html: str, base_url: str = '/') -> str:
     """Put the stylesheet, the link preview and the static masthead into the HTML
     Gradio serves at `/`."""
@@ -278,13 +287,17 @@ def create_site(service=None):
         if request.url.path != '/' or not response.headers.get('content-type', '').startswith('text/html'):
             return response
         body = b''.join([chunk async for chunk in response.body_iterator]).decode('utf-8')
-        body = boot_document(body, str(request.base_url)).encode('utf-8')
+        body = boot_document(body, public_base_url(request)).encode('utf-8')
         headers = {k: v for k, v in response.headers.items() if k.lower() != 'content-length'}
         return Response(content=body, status_code=response.status_code, headers=headers)
 
     @site.get('/favicon.ico', include_in_schema=False)
     def favicon():
-        return FileResponse(ASSETS / 'bike-mark.webp', media_type='image/webp')
+        return FileResponse(ASSETS / 'favicon.ico', media_type='image/vnd.microsoft.icon')
+
+    @site.get('/apple-touch-icon.png', include_in_schema=False)
+    def touch_icon():
+        return FileResponse(ASSETS / 'apple-touch-icon.png', media_type='image/png')
 
     @site.get('/draw', response_class=HTMLResponse)
     def draw():
@@ -312,8 +325,9 @@ def create_site(service=None):
         return (ASSETS / "about.html").read_text().replace("{{HEADER}}", header("about")).replace("{{FOOTER}}", footer())
 
     return gr.mount_gradio_app(site, create_app(service), path="/", css=CSS, theme=THEME,
-                              show_error=False, favicon_path=str(ASSETS / 'bike-mark.webp'),
-                              head='<script src="/drawing-assets/busy.js"></script><script src="/drawing-assets/playback.js"></script>')
+                              show_error=False, favicon_path=str(ASSETS / 'favicon.ico'),
+                              head='<link rel="apple-touch-icon" href="/apple-touch-icon.png">'
+                                   '<script src="/drawing-assets/busy.js"></script><script src="/drawing-assets/playback.js"></script>')
 
 
 def main():

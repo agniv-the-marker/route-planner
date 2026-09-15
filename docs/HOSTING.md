@@ -1,12 +1,10 @@
 # Public website hosting
 
-The public entry point is https://agniv.me/route-planner/.
-GitHub Pages serves an iframe wrapper; Modal serves the Python/Gradio application at
-https://nyro-robotics--route-sculptor-web.modal.run/.
-The browser address remains on agniv.me while drawing, text, and about navigation happen
-inside the frame. The wrapper uses the app’s bicycle favicon and Route Sculptor title.
-A direct custom domain would allow normal address-bar navigation; this iframe does not
-synchronize its internal location with the outer page.
+The public entry point is https://routesculptor.bike/. Modal serves the Python/Gradio
+application at https://nyro-robotics--route-sculptor-web.modal.run/, and a Cloudflare
+Worker on the domain passes requests through to it; `hosting/` holds that Worker and its
+setup. Because it proxies instead of framing, `/draw` and `/about` are ordinary
+addressable pages. https://agniv.me/route-planner/ redirects to the domain.
 
 ## Deploy
 
@@ -16,16 +14,16 @@ From this repository, with the existing SF graph and terrain prepared:
 MODAL_PROFILE=nyro-robotics .venv/bin/modal deploy scripts/modal_app.py
 ```
 
-The public wrapper is `route-planner/index.html` in the separate agniv.me repository,
-whose `gh-pages` branch publishes it. Deploy server changes here; push wrapper changes
-there. A private repository cannot be a GitHub Pages submodule. Do not change repository
-visibility just to publish this wrapper.
+The old address is `route-planner/index.html` in the separate agniv.me repository, whose
+`gh-pages` branch publishes it; it is a redirect and needs no further changes. Deploy the
+Worker from `hosting/` with Wrangler. A private repository cannot be a GitHub Pages
+submodule. Do not change repository visibility just to publish anything here.
 
 ## Credentials
 
 Deployment uses the locally configured `nyro-robotics` Modal profile. Inside Modal,
 the app uses its workspace identity to call `route-sculptor-outlines-v2`.
-No Modal token is included in HTML, Git, image environment variables, or an iframe URL.
+No Modal token is included in HTML, Git, image environment variables, or the Worker.
 Use Modal's local authentication flow for a new machine. Keep credentials outside both
 repositories; use secret storage if automated deployment is added later.
 
@@ -60,12 +58,12 @@ is independently deployed and also scales to zero.
 ## Verify and roll back
 
 Check `/health`, `/`, `/draw`, and `/about` on the Modal URL, then exercise drawing and
-GPX download through the public iframe. Cached `fish` or `heart` can verify text without
+GPX download on routesculptor.bike, watching that the address bar follows each mode. Cached `fish` or `heart` can verify text without
 fresh inference. Live novel prompts incur inference charges.
 
 To roll back the server, check out the desired source revision and redeploy without
-resetting the persistent volume. To unpublish, remove the wrapper from agniv.me and stop
-only the `route-sculptor` app in Modal; the separately used GPU worker should remain.
+resetting the persistent volume. To unpublish, delete the Worker and stop only the
+`route-sculptor` app in Modal; the separately used GPU worker should remain.
 
 ## Deployment verification — 2026-09-14
 

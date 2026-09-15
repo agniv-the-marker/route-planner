@@ -1,0 +1,10 @@
+name = "route-sculptor-proxy"
+main = "worker.js"
+compatibility_date = "2025-09-01"
+
+# custom_domain lets Wrangler create the proxied DNS records itself, so the zone needs
+# nothing but Cloudflare's nameservers. Both names answer; the Worker serves them alike.
+routes = [
+  { pattern = "routesculptor.bike", custom_domain = true },
+  { pattern = "www.routesculptor.bike", custom_domain = true },
+]
