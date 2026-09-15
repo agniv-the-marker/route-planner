@@ -1,7 +1,15 @@
-.editor { margin-top:18px; }
+.editor { margin-top:12px; }
 .canvas-toolbar { display:flex; align-items:center; justify-content:space-between; gap:12px; border:1px solid #cfd4cc; border-bottom:0; padding:9px 12px; color:var(--muted, #677062); font:var(--mono-lg)/1.5 var(--mono); }
-.drawing-label { display:flex; align-items:center; gap:8px; }
-.drawing-label svg { width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:1.5; stroke-linejoin:round; stroke-linecap:round; }
+.draw-intro { margin:20px 0 0; color:#4a5248; font:var(--body-size)/1.4 var(--title-font); }
+.draw-intro b { font-weight:400; }
+.ink-route { color:#d75332; }
+.ink-guide { color:#5b78b0; }
+/* One control that reports the pen it will draw with, and switches on click. */
+.pen-toggle { display:flex; align-items:center; gap:8px; border:1px solid #c8cfc2; background:transparent;
+  color:inherit; font:inherit; padding:5px 10px; cursor:pointer; }
+.pen-toggle:hover { border-color:#637baa; }
+.pen-swatch { width:10px; height:10px; border-radius:50%; background:#d75332; }
+.pen-toggle[data-pen="guide"] .pen-swatch { background:#5b78b0; }
 .toolbar { display:flex; gap:8px; }
 .toolbar button { border:1px solid #c8cfc2; background:transparent; color:inherit; font:inherit; padding:5px 10px; cursor:pointer; }
 .toolbar button:hover { border-color:#637baa; color:#637baa; }

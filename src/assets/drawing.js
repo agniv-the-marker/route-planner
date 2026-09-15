@@ -2,7 +2,11 @@
 (() => {
   'use strict';
   const NS = 'http://www.w3.org/2000/svg';
-  const state = { strokes: [], undo: [], revision: 0, request: null, maps: [], urls: [] };
+  // Two pens. Route strokes are what gets routed; guides are reference only and are
+  // never sent to the server.
+  const PENS = { route: '#d75332', guide: '#5b78b0' };
+  const state = { strokes: [], undo: [], revision: 0, request: null, maps: [], urls: [], pen: 'route' };
+  const routeStrokes = () => state.strokes.filter(stroke => stroke.pen !== 'guide');
   const $ = (selector, root = document) => root?.querySelector(selector);
   const clone = value => JSON.parse(JSON.stringify(value));
   const clamp = value => Math.max(0, Math.min(1, value));
@@ -14,7 +18,10 @@
     el.classList.toggle('error', error);
   }
   function persist() {
-    try { localStorage.setItem('route-sculptor-drawing', JSON.stringify(state.strokes)); } catch (_) {}
+    try {
+      localStorage.setItem('route-sculptor-drawing',
+        JSON.stringify({ pen: state.pen, strokes: state.strokes }));
+    } catch (_) {}
   }
   function disposeResults() {
     state.maps.splice(0).forEach(map => map.destroy?.() ?? map.stop?.());
@@ -37,19 +44,40 @@
     $('[data-action="undo"]').disabled = !state.undo.length;
     $('[data-action="clear"]').disabled = !state.strokes.length;
   }
+  function setPen(pen) {
+    state.pen = PENS[pen] ? pen : 'route';
+    const button = $('[data-action="pen"]');
+    if (!button) return;
+    button.dataset.pen = state.pen;
+    $('.pen-name', button).textContent = state.pen === 'guide' ? 'guideline' : 'route';
+    button.setAttribute('aria-label',
+      `Drawing ${state.pen === 'guide' ? 'guidelines' : 'the route'}. Switch pen.`);
+    persist();
+  }
+  function trace(points) {
+    ctx.beginPath();
+    points.forEach((p, i) => i ? ctx.lineTo(p[0] * 511, p[1] * 511) : ctx.moveTo(p[0] * 511, p[1] * 511));
+    ctx.stroke();
+  }
   function paint() {
     if (!ctx) return;
     ctx.clearRect(0, 0, 511, 511);
     ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--map-paper') || '#f1f2ec';
     ctx.fillRect(0, 0, 511, 511);
-    ctx.strokeStyle = '#d75332';
-    ctx.lineWidth = 2.2;
     ctx.lineCap = ctx.lineJoin = 'round';
-    state.strokes.forEach((stroke, index) => {
-      ctx.beginPath();
-      stroke.forEach((p, i) => i ? ctx.lineTo(p[0] * 511, p[1] * 511) : ctx.moveTo(p[0] * 511, p[1] * 511));
-      ctx.stroke();
-      const from = state.strokes[index - 1]?.at(-1), to = stroke[0];
+    // Guides first, so the route always reads on top of them.
+    state.strokes.filter(stroke => stroke.pen === 'guide').forEach(stroke => {
+      ctx.save();
+      ctx.strokeStyle = PENS.guide; ctx.lineWidth = 1.6; ctx.setLineDash([6, 4]);
+      trace(stroke.points); ctx.restore();
+    });
+    ctx.strokeStyle = PENS.route;
+    ctx.lineWidth = 2.2;
+    const routes = routeStrokes();
+    routes.forEach((stroke, index) => {
+      trace(stroke.points);
+      // Transfers are drawn between consecutive route strokes; guides never transfer.
+      const from = routes[index - 1]?.points.at(-1), to = stroke.points[0];
       if (from && to) {
         ctx.save(); ctx.setLineDash([3, 3]); ctx.lineWidth = 1.1;
         ctx.beginPath(); ctx.moveTo(from[0] * 511, from[1] * 511); ctx.lineTo(to[0] * 511, to[1] * 511); ctx.stroke(); ctx.restore();
@@ -75,7 +103,9 @@
     canvas.addEventListener('pointerdown', event => {
       if (event.button !== 0 || active) return;
       canvas.setPointerCapture(event.pointerId);
-      snapshot(); active = [point(event)]; state.strokes.push(active);
+      snapshot();
+      active = [point(event)];
+      state.strokes.push({ pen: state.pen, points: active });
       invalidate(); paint();
     });
     canvas.addEventListener('pointermove', event => {
@@ -181,7 +211,8 @@
   }
   async function submit() {
     if (state.request) return;
-    if (!state.strokes.some(stroke => stroke.length > 1)) return status('Draw a line on the canvas first.', true);
+    const routes = routeStrokes().map(stroke => stroke.points).filter(points => points.length > 1);
+    if (!routes.length) return status('Draw a red route line on the canvas first.', true);
     const revision = state.revision, controller = new AbortController();
     state.request = controller;
     let timedOut = false;
@@ -192,7 +223,7 @@
     try {
       const response = await fetch('/api/drawing/fit', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: 'canvas', strokes: clone(state.strokes) }), signal: controller.signal
+        body: JSON.stringify({ mode: 'canvas', strokes: clone(routes) }), signal: controller.signal
       });
       const data = await response.json();
       if (revision !== state.revision) return;
@@ -207,11 +238,21 @@
   document.addEventListener('DOMContentLoaded', () => {
     try {
       const saved = JSON.parse(localStorage.getItem('route-sculptor-drawing') || 'null');
-      const strokes = Array.isArray(saved) ? saved : saved?.canvas;
-      if (Array.isArray(strokes) && strokes.every(stroke => Array.isArray(stroke) && stroke.every(p => Array.isArray(p) && p.length === 2 && p.every(Number.isFinite)))) state.strokes = strokes;
-    } catch (_) {}
+      const raw = Array.isArray(saved) ? saved : (saved?.strokes ?? saved?.canvas);
+      const points = value => Array.isArray(value)
+        && value.every(p => Array.isArray(p) && p.length === 2 && p.every(Number.isFinite));
+      // Strokes were bare point arrays before guidelines existed; those are all routes.
+      const restored = Array.isArray(raw) ? raw.map(stroke => Array.isArray(stroke)
+        ? { pen: 'route', points: stroke }
+        : { pen: stroke?.pen === 'guide' ? 'guide' : 'route', points: stroke?.points }) : [];
+      if (restored.every(stroke => points(stroke.points))) state.strokes = restored;
+      setPen(saved?.pen);
+    } catch (_) { setPen('route'); }
     setupCanvas();
-    document.querySelectorAll('[data-action]').forEach(button => button.addEventListener('click', () => history(button.dataset.action)));
+    document.querySelectorAll('[data-action]').forEach(button => button.addEventListener('click',
+      () => button.dataset.action === 'pen'
+        ? setPen(state.pen === 'route' ? 'guide' : 'route')
+        : history(button.dataset.action)));
     $('#submit').addEventListener('click', submit);
     window.addEventListener('pagehide', () => { state.request?.abort(); disposeResults(); });
   });

@@ -11,9 +11,11 @@
 <body>
   <main class="site-shell draw-page">
     {{HEADER}}
+    <p class="draw-intro">Draw a ride! <b class="ink-route">Red</b> is for the route, <b class="ink-guide">blue</b> is for guidelines.</p>
     <section class="editor" data-editor="canvas" aria-label="Draw a ride">
       <div class="canvas-toolbar">
-        <span class="drawing-label"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 16-1 5 5-1L21 7l-4-4Z M14 6l4 4"/></svg>draw a ride</span>
+        <button type="button" class="pen-toggle" data-action="pen" data-pen="route">
+          <span class="pen-swatch" aria-hidden="true"></span><span class="pen-name">route</span></button>
         <div class="toolbar" aria-label="Canvas drawing tools">
           <button type="button" data-action="undo">undo</button>
           <button type="button" data-action="clear">clear</button>
