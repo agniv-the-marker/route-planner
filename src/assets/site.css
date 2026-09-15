@@ -13,9 +13,19 @@ body::before { content:""; position:fixed; top:0; bottom:0; left:max(0px,calc((1
   transform:translateZ(0); contain:layout paint style;
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.15' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.7'/%3E%3C/svg%3E"); background-size:160px 160px; }
 .gradio-container, .site-shell, .draw-page { width: 100% !important; box-sizing: border-box; max-width: 1080px !important;
-  margin: auto !important; padding: 22px 24px 32px !important; animation:page-in .3s ease-out both; }
+  margin: auto !important; animation:page-in .3s ease-out both;
+  /* Deliberately not in a media query. Gradio rewrites injected selectors to
+     `.gradio-container ... .contain <sel>`, and only emits an unscoped copy of
+     top-level rules — so a media query aimed at the container itself matches nothing
+     and the phone padding silently stayed at the desktop value. clamp() needs no
+     query, so all three pages land on the same header geometry.
+     Endpoints match the old breakpoint: 14/12/24 at 400px, 22/24/32 at 1080px. */
+  padding: clamp(14px, 3.5vw, 22px) clamp(12px, 3vw, 24px) clamp(24px, 5vw, 32px) !important; }
 .gradio-container > .main { width: 100% !important; padding: 0 !important; }
-#masthead { box-sizing:border-box; width:100%; border-bottom:1px solid #d9dad5; padding:0 0 12px; margin:0 0 16px; min-height:49px; }
+#masthead { box-sizing:border-box; width:100%; border-bottom:1px solid #d9dad5; padding:0 0 12px; margin:0 0 16px; min-height:49px;
+  /* Gradio inherits 14px here and the static pages 16px; nothing visible relies on it,
+     but pin it so the three headers share one cascade. */
+  font: 400 var(--mono-md)/1.5 var(--mono); }
 #masthead-block, #credits-block { padding:0 !important; border:0 !important; background:none !important; min-height:0 !important; }
 /* Gradio pads every HTML block; strip it so the masthead/footer align with the static pages. */
 #masthead-block .html-container, #credits-block .html-container, #route-map .html-container { padding:0 !important; }
@@ -116,7 +126,6 @@ body.popup-open { overflow: hidden; }
   cursor: pointer; min-width: 44px; min-height: 44px; }
 footer:not(#credits) { display: none !important; }
 @media(max-width: 600px) {
-  .gradio-container, .site-shell, .draw-page { padding: 14px 12px 24px !important; }
   .wordmark { font-size:27px; line-height:36px; }
   .site-header, .site-header nav { gap: 12px; }
   #prompt-bar { flex-wrap: nowrap !important; }
