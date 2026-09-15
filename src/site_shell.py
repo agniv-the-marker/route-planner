@@ -16,6 +16,9 @@ def header(page: str = "text") -> str:
 
 def footer() -> str:
     return (
+        # The spacer absorbs leftover height so a short page still ends with the footer
+        # at the bottom, and keeps a fixed gap once the page is tall enough to scroll.
+        '<div class="footer-spacer" aria-hidden="true"></div>'
         '<footer id="credits"><span>© '
         '<a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> · '
         '<a href="/about">terrain &amp; credits</a></span>'

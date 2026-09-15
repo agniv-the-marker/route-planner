@@ -7,6 +7,14 @@
 html { overflow-y:scroll; }
 body { margin:0; background:#fff !important; color:#343b35; }
 .gradio-container, .site-shell, .draw-page { background: var(--page-paper) !important; min-height:100vh; }
+.site-shell, .draw-page { display: flex; flex-direction: column; }
+/* Takes up the slack on a short page and keeps a fixed gap once it scrolls. */
+.footer-spacer { flex: 1 1 auto; min-height: 32px; }
+/* Gradio's wrappers size to content, so the auto margin below had nothing to
+   push against; let the chain down to the block column fill the 100vh page. */
+.gradio-container > .main, .gradio-container .wrap, .gradio-container .contain,
+.gradio-container .contain > .column { flex: 1 1 auto; }
+#credits-block { margin-top: auto !important; }
 /* A quiet paper/film texture over the page, kept out of the interaction layer. */
 body::before { content:""; position:fixed; top:0; bottom:0; left:max(0px,calc((100vw - 1080px)/2)); right:max(0px,calc((100vw - 1080px)/2)); z-index:10000; pointer-events:none; opacity:.32; mix-blend-mode:multiply;
   /* Own compositor layer: otherwise every map repaint re-multiplies the whole column on the main thread. */
@@ -30,7 +38,13 @@ body::before { content:""; position:fixed; top:0; bottom:0; left:max(0px,calc((1
 /* Gradio pads every HTML block; strip it so the masthead/footer align with the static pages. */
 #masthead-block .html-container, #credits-block .html-container, #route-map .html-container { padding:0 !important; }
 .site-shell, .site-shell *, .site-shell *::before, .site-shell *::after { box-sizing:border-box; }
-.site-header, .site-header nav { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.site-header, .site-header nav { display: flex; justify-content: space-between; gap: 20px; }
+/* The nav sits on the wordmark's bottom edge. Centred, it floated ~9px above it,
+   which read as misaligned against the much taller wordmark. */
+.site-header { align-items: flex-end; }
+/* Bottom-aligned, then lifted a little: flush with the wordmark's descender line
+   sat too low, centred floated ~9px too high. */
+.site-header nav { align-items: center; margin-bottom: 4px; }
 .wordmark { display:flex; align-items:center; gap:8px; font: 400 30px/36px var(--title-font); letter-spacing: -.6px; color: #353c35; white-space: nowrap; }
 .wordmark img { width:28px; height:28px; object-fit:cover; border-radius:50%; mix-blend-mode:multiply; }
 .site-header a { text-decoration: none; }
@@ -57,7 +71,7 @@ button.is-busy::after { content:"🚲"; display:inline-block; position:relative;
 [data-testid="status-tracker"], .generating .progress-bar, .generating .progress-text, .generating .eta { display:none !important; }
 #status:has(.prose:empty) { display: none; }
 #status p, #credits p, .block label { font: var(--mono-md)/1.5 var(--mono) !important; color: #677062; }
-#credits { box-sizing:border-box; width:100%; margin:32px 0 0; padding:16px 0 0; border-top:1px solid #d9dad5; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; text-align:left; font:400 var(--mono-md)/16px var(--mono); color:#677062; }
+#credits { box-sizing:border-box; width:100%; margin:0; padding:16px 0 0; border-top:1px solid #d9dad5; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; text-align:left; font:400 var(--mono-md)/16px var(--mono); color:#677062; }
 #credits > a:last-child { margin-left:auto; }
 #credits a { color:inherit; }
 #credits p { font-size: var(--mono-md) !important; }
