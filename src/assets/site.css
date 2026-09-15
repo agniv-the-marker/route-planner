@@ -3,9 +3,13 @@
   --page-paper: #fafafa; --map-paper: #f1f2ec; --title-font: 'EB Garamond', Georgia, serif;
   --mono: 'JetBrains Mono', monospace;
   /* One mono scale for all chrome: controls/nav at --mono-lg, secondary text at --mono-md. */
-  --mono-lg: 12px; --mono-md: 11px; --body-size: 21px; }
-html { overflow-y:scroll; }
-body { margin:0; background:#fff !important; color:#343b35; }
+  --mono-lg: 12px; --mono-md: 11px; --body-size: 21px;
+  --ink: #343b35; --ink-quiet: #677062; }
+/* The page is painted light throughout. Without this, a visitor whose OS asks for dark
+   gets Gradio's dark theme text and the browser's dark form controls over our light
+   paper, which left the prompt typed in white on white. */
+html { overflow-y:scroll; color-scheme: light; }
+body { margin:0; background:#fff !important; color:var(--ink); }
 .gradio-container, .site-shell, .draw-page { background: var(--page-paper) !important; min-height:100vh; }
 .site-shell, .draw-page { display: flex; flex-direction: column; }
 /* Takes up the slack on a short page and keeps a fixed gap once it scrolls. */
@@ -70,8 +74,13 @@ html.is-booting gradio-app { visibility: hidden; }
 html:not([data-debug="true"]) [data-open="debug"], html:not([data-dev="true"]) [data-open="dev"] { display: none; }
 #prompt-bar { gap: 10px; align-items: stretch; }
 #prompt-box { border: 1px solid #d9dad5 !important; border-radius: 0 !important; }
+/* Gradio draws its own edge on the wrapping form and recolours it from the theme, which
+   goes near-black on a dark machine; pin both edges to the site's hairline instead. */
+#prompt-bar .form, #prompt-box:focus-within, #prompt-bar .form:focus-within { border-color: #d9dad5 !important; }
 #prompt-box, #prompt-box textarea { background: var(--page-paper) !important; }
-#prompt-box textarea { font: var(--body-size) 'EB Garamond', Georgia, serif; padding: 12px !important; }
+#prompt-box textarea { font: var(--body-size) 'EB Garamond', Georgia, serif; padding: 12px !important;
+  color: var(--ink) !important; caret-color: var(--ink); -webkit-text-fill-color: var(--ink); }
+#prompt-box textarea::placeholder { color: var(--ink-quiet) !important; -webkit-text-fill-color: var(--ink-quiet); opacity: 1; }
 #generate-button { border-radius: 0 !important; background: var(--route-color) !important; border-color: var(--route-color) !important;
   color: white !important; font: var(--mono-lg) var(--mono); box-shadow: none; min-height: 48px; white-space: nowrap; }
 #status { min-height: 0; padding: 0; }
