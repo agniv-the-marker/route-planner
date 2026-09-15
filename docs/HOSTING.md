@@ -4,7 +4,9 @@ The public entry point is https://agniv.me/route-planner/.
 GitHub Pages serves an iframe wrapper; Modal serves the Python/Gradio application at
 https://nyro-robotics--route-sculptor-web.modal.run/.
 The browser address remains on agniv.me while drawing, text, and about navigation happen
-inside the frame. A direct link is available for browsers that restrict embedded apps.
+inside the frame. The wrapper uses the app’s bicycle favicon and Route Sculptor title.
+A direct custom domain would allow normal address-bar navigation; this iframe does not
+synchronize its internal location with the outer page.
 
 ## Deploy
 
