@@ -91,8 +91,9 @@ MODAL_PROFILE=nyro-robotics modal deploy scripts/modal_app.py       # the CPU we
 ```
 
 `route-sculptor-symbols` (one L4, scales to zero after 5 minutes idle) is deployed today in
-the `nyro-robotics` Modal workspace; the CPU website app is defined but not currently
-deployed, so the site runs locally only unless you deploy it yourself. Both the exact-match
+the `nyro-robotics` Modal workspace. The CPU website is now deployed at
+[agniv.me/route-planner](https://agniv.me/route-planner/) with the current diffusion
+pipeline and drawing mode; see [HOSTING.md](docs/HOSTING.md). Both the exact-match
 path and the model path were validated end to end — see
 [SYMBOL_EVALUATION.md](SYMBOL_EVALUATION.md) for measured pass rates, timings, and evidence,
 including a real browser run and a full sweep of every catalogue symbol against the live

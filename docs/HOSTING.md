@@ -64,3 +64,17 @@ fresh inference. Live novel prompts incur inference charges.
 To roll back the server, check out the desired source revision and redeploy without
 resetting the persistent volume. To unpublish, remove the wrapper from agniv.me and stop
 only the `route-sculptor` app in Modal; the separately used GPU worker should remain.
+
+## Deployment verification — 2026-09-14
+
+The public URL and mobile embed loaded in Chromium. Canvas drawing returned a route
+with an 855-point GPX download through the public frame and no browser errors.
+A fresh `a bold circle` request completed four Modal calls, retained their durable IDs,
+and produced two valid contour candidates. One fitted an 18.2-mile loop. The September
+ledger uses the $100 cap and reserves $4 for those four calls pending reconciliation.
+Two selected `fish` contours had no qualifying route within the existing search limit;
+this was reported explicitly, without substituting shapes.
+
+Focused diffusion/web tests passed (13), followed by the monthly-rollover test and an
+additional test proving storage failure prevents paid dispatch. OpenCV is now declared
+in project dependencies, fixing the initial clean-container startup failure.
